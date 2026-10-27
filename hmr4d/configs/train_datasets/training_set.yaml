@@ -1,0 +1,212 @@
+# Training-set configuration. Dataset roots are supplied by an environment variable.
+
+amass_00:
+  _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+  amass_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_00/motion.pth"
+  g1_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_00/g1.pth"
+  g1_input_is_yup: true
+  amass_fps: 30.0
+  motion_frames: 120
+  cam_augmentation: v11
+  canonicalize_first_frame: true
+  align_target: pelvis
+  floor_adjust: true
+  yaw_only_canon: true
+  apply_az_to_ay_g1: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+  ratio_lo: [0.7, 0.7, -.inf]
+  ratio_hi: [1.05, 1.05, .inf]
+  ratio_thr: 0.1
+  skip_substrings: []
+
+amass_01:
+  _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+  amass_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_01/motion.pth"
+  g1_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_01/g1.pth"
+  g1_input_is_yup: true
+  amass_fps: 30.0
+  motion_frames: 120
+  cam_augmentation: v11
+  canonicalize_first_frame: true
+  align_target: pelvis
+  floor_adjust: true
+  yaw_only_canon: true
+  apply_az_to_ay_g1: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+  ratio_lo: [0.7, 0.7, -.inf]
+  ratio_hi: [1.05, 1.05, .inf]
+  ratio_thr: 0.1
+  skip_substrings: []
+
+bedlam2_00:
+  _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_paths:
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/bbox_00.pth"
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/bbox_01.pth"
+  vitpose_pth_paths:
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/keypoints_00.pth"
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/keypoints_01.pth"
+  imgfeat_pth_paths:
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/image_features_00.pth"
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/image_features_01.pth"
+  imgfeat_dir: null
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+
+bedlam2_01:
+  _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/bbox.pth"
+  vitpose_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/keypoints.pth"
+  imgfeat_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/image_features.pth"
+  imgfeat_dir: null
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+
+bedlam2_02:
+  _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/bbox.pth"
+  vitpose_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/keypoints.pth"
+  imgfeat_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/image_features.pth"
+  imgfeat_dir: null
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+# Remaining real-video and SOMA sources complete the training set.
+# All data roots are supplied through the release environment variables.
+
+bedlam_00:
+  _target_: hmr4d.dataset.bedlam.bedlam.BedlamG1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_paths:
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/bbox_00.pth"
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/bbox_01.pth"
+  vitpose_pth_paths:
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/keypoints_00.pth"
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/keypoints_01.pth"
+  imgfeat_pth_paths:
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/image_features_00.pth"
+    - "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/image_features_01.pth"
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  camera_source: bedlam_smpl
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+
+bedlam_01:
+  _target_: hmr4d.dataset.bedlam.bedlam.BedlamG1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01/bbox.pth"
+  vitpose_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01/keypoints.pth"
+  imgfeat_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01/image_features.pth"
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  camera_source: bedlam_smpl
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+
+h36m_00:
+  _target_: hmr4d.dataset.h36m.h36m.H36mG1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00/bbox.pth"
+  vitpose_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00/keypoints.pth"
+  imgfeat_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00/image_features.pth"
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+
+h36m_01:
+  _target_: hmr4d.dataset.h36m.h36m.H36mG1Dataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01"
+  smplx_pth_name: motion.pth
+  g1_pth_name: g1.pth
+  bbox_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01/bbox.pth"
+  vitpose_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01/keypoints.pth"
+  imgfeat_pth_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01/image_features.pth"
+  motion_frames: 120
+  min_motion_frames: 60
+  g1_input_is_yup: false
+  dof_pos_order: mjc
+  canonicalize_first_frame: true
+  floor_adjust: true
+  yaw_only_canon: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+
+bones_seed:
+  _target_: hmr4d.dataset.pure_motion.g1_amass.BonesSeedG1SomaDataset
+  data_dir: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/samples"
+  index_path: "${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/index.json"
+  motion_frames: 120
+  cam_augmentation: v11
+  canonicalize_first_frame: true
+  yaw_only_canon: true
+  floor_adjust: true
+  split: train
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+  # Bones Seed exporter contract is BYD order. Unlike BEDLAM/H36M, this
+  # source must not pass through the MJC->BYD permutation a second time.
+  dof_pos_order: byd
+  soma_obs_indices: [6, 7, 9, 15, 10, 16, 11, 17, 20, 24, 21, 25, 22, 26]

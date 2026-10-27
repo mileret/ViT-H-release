@@ -1,0 +1,13 @@
+# Training-only Lightning data module: no validation or test dataset is
+# composed or instantiated.
+_target_: hmr4d.datamodule.mocap_trainX_testY.DataModule
+
+dataset_opts:
+  train: ${train_datasets}
+
+loader_opts:
+  train:
+    batch_size: 32
+    num_workers: 8
+
+limit_each_trainset: null

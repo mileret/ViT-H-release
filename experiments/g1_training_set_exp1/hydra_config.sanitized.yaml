@@ -1,0 +1,552 @@
+task: fit
+exp_name: g1_training_set_exp1
+data_name: g1_amass_bedlam_bedlam2_h36m_bones
+output_dir: outputs/${data_name}/${exp_name}
+ckpt_path: null
+resume_mode: null
+seed: 42
+pl_trainer:
+  devices: 8
+  num_sanity_val_steps: 0
+  precision: bf16-mixed
+  inference_mode: false
+  log_every_n_steps: 1
+  gradient_clip_val: 0.5
+  max_epochs: 10000
+  check_val_every_n_epoch: 10
+  strategy: ddp_find_unused_parameters_true
+  use_distributed_sampler: false
+  limit_val_batches: 0
+logger:
+  _target_: pytorch_lightning.loggers.WandbLogger
+  project: offline
+  name: ${exp_name}
+  save_dir: ${output_dir}
+  offline: false
+  log_model: false
+  job_type: train
+  group: ${data_name}
+  tags:
+  - offline
+  - g1
+  - training_set
+  - amass
+  - bedlam
+  - bedlam2
+  - h36m
+  - bones_seed
+  - exp1
+  - huber
+  - lr2e4
+  - l16
+  - d1024
+  - h16
+  - bs32
+  entity: ${WANDB_ENTITY}
+data:
+  _target_: hmr4d.datamodule.mocap_trainX_testY.DataModule
+  dataset_opts:
+    train: ${train_datasets}
+  loader_opts:
+    train:
+      batch_size: 32
+      num_workers: 1
+      source_homogeneous_batches: false
+      shuffle: true
+      seed: ${seed}
+      source_mixed_batches: true
+    val:
+      batch_size: 1
+      num_workers: 0
+  limit_each_trainset: null
+model:
+  _target_: hmr4d.model.offline.offline_pl.OfflinePL
+  pipeline: ${pipeline}
+  optimizer: ${optimizer}
+  scheduler_cfg: ${scheduler_cfg}
+  ignored_weights_prefix:
+  - smplx
+callbacks:
+  simple_ckpt_saver:
+    _target_: hmr4d.utils.callbacks.simple_ckpt_saver.SimpleCkptSaver
+    output_dir: ${output_dir}/checkpoints/
+    filename: e{epoch:03d}-s{step:06d}.ckpt
+    save_top_k: 100
+    every_n_epochs: 10
+    save_last: null
+    save_weights_only: true
+  prog_bar:
+    _target_: hmr4d.utils.callbacks.prog_bar.ProgressReporter
+    log_every_percent: 0.02
+    exp_name: ${exp_name}
+    data_name: ${data_name}
+  train_speed_timer:
+    _target_: hmr4d.utils.callbacks.train_speed_timer.TrainSpeedTimer
+    N_avg: 5
+  lr_monitor:
+    _target_: pytorch_lightning.callbacks.lr_monitor.LearningRateMonitor
+network:
+  _target_: hmr4d.network.offline.relative_transformer.NetworkEncoderRoPE
+  output_dim: 189
+  xt_dim: 189
+  max_len: 120
+  cliffcam_dim: 3
+  cam_angvel_dim: 6
+  imgseq_dim: 1024
+  obs_num_joints: 14
+  latent_dim: 1024
+  num_layers: 16
+  num_heads: 16
+  mlp_ratio: 4.0
+  pred_cam_dim: 3
+  static_conf_dim: 6
+  dropout: 0.1
+  avgbeta: false
+optimizer:
+  _target_: torch.optim.adam.Adam
+  _partial_: true
+  lr: 0.0002
+scheduler_cfg:
+  scheduler: null
+train_datasets:
+  amass_00:
+    _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+    amass_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_00/motion.pth
+    g1_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_00/g1.pth
+    g1_input_is_yup: true
+    amass_fps: 30.0
+    motion_frames: 120
+    cam_augmentation: v11
+    canonicalize_first_frame: true
+    align_target: pelvis
+    floor_adjust: true
+    yaw_only_canon: true
+    apply_az_to_ay_g1: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+    ratio_lo:
+    - 0.7
+    - 0.7
+    - -.inf
+    ratio_hi:
+    - 1.05
+    - 1.05
+    - .inf
+    ratio_thr: 0.1
+    skip_substrings: []
+  amass_01:
+    _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+    amass_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_01/motion.pth
+    g1_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_01/g1.pth
+    g1_input_is_yup: true
+    amass_fps: 30.0
+    motion_frames: 120
+    cam_augmentation: v11
+    canonicalize_first_frame: true
+    align_target: pelvis
+    floor_adjust: true
+    yaw_only_canon: true
+    apply_az_to_ay_g1: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+    ratio_lo:
+    - 0.7
+    - 0.7
+    - -.inf
+    ratio_hi:
+    - 1.05
+    - 1.05
+    - .inf
+    ratio_thr: 0.1
+    skip_substrings: []
+  bedlam2_00:
+    _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_paths:
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/bbox_00.pth
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/bbox_01.pth
+    vitpose_pth_paths:
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/keypoints_00.pth
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/keypoints_01.pth
+    imgfeat_pth_paths:
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/image_features_00.pth
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/image_features_01.pth
+    imgfeat_dir: null
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  bedlam2_01:
+    _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/image_features.pth
+    imgfeat_dir: null
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  bedlam2_02:
+    _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/image_features.pth
+    imgfeat_dir: null
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  bedlam_00:
+    _target_: hmr4d.dataset.bedlam.bedlam.BedlamG1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_paths:
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/bbox_00.pth
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/bbox_01.pth
+    vitpose_pth_paths:
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/keypoints_00.pth
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/keypoints_01.pth
+    imgfeat_pth_paths:
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/image_features_00.pth
+    - ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_00/image_features_01.pth
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    camera_source: bedlam_smpl
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  bedlam_01:
+    _target_: hmr4d.dataset.bedlam.bedlam.BedlamG1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam/part_01/image_features.pth
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    camera_source: bedlam_smpl
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  h36m_00:
+    _target_: hmr4d.dataset.h36m.h36m.H36mG1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_00/image_features.pth
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  h36m_01:
+    _target_: hmr4d.dataset.h36m.h36m.H36mG1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/h36m/part_01/image_features.pth
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+  bones_seed:
+    _target_: hmr4d.dataset.pure_motion.g1_amass.BonesSeedG1SomaDataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/samples
+    index_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/index.json
+    motion_frames: 120
+    cam_augmentation: v11
+    canonicalize_first_frame: true
+    yaw_only_canon: true
+    floor_adjust: true
+    split: train
+    split_seed: 42
+    split_ratios:
+    - 1.0
+    - 0.0
+    - 0.0
+    dof_pos_order: byd
+    soma_obs_indices:
+    - 6
+    - 7
+    - 9
+    - 15
+    - 10
+    - 16
+    - 11
+    - 17
+    - 20
+    - 24
+    - 21
+    - 25
+    - 22
+    - 26
+test_datasets:
+  amass_00:
+    _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+    amass_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_00/motion.pth
+    g1_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_00/g1.pth
+    g1_input_is_yup: true
+    amass_fps: 30.0
+    motion_frames: 120
+    cam_augmentation: v11
+    canonicalize_first_frame: true
+    align_target: pelvis
+    floor_adjust: true
+    yaw_only_canon: true
+    apply_az_to_ay_g1: true
+    split: val
+    split_seed: 42
+    split_ratios:
+    - 0.9
+    - 0.05
+    - 0.05
+    ratio_lo:
+    - 0.7
+    - 0.7
+    - -.inf
+    ratio_hi:
+    - 1.05
+    - 1.05
+    - .inf
+    ratio_thr: 0.1
+    skip_substrings: []
+  amass_01:
+    _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+    amass_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_01/motion.pth
+    g1_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/amass/part_01/g1.pth
+    g1_input_is_yup: true
+    amass_fps: 30.0
+    motion_frames: 120
+    cam_augmentation: v11
+    canonicalize_first_frame: true
+    align_target: pelvis
+    floor_adjust: true
+    yaw_only_canon: true
+    apply_az_to_ay_g1: true
+    split: val
+    split_seed: 42
+    split_ratios:
+    - 0.9
+    - 0.05
+    - 0.05
+    ratio_lo:
+    - 0.7
+    - 0.7
+    - -.inf
+    ratio_hi:
+    - 1.05
+    - 1.05
+    - .inf
+    ratio_thr: 0.1
+    skip_substrings: []
+  bedlam2_00:
+    _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/bbox_00.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/keypoints_00.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_00/image_features_00.pth
+    imgfeat_dir: null
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: val
+    split_seed: 42
+    split_ratios:
+    - 0.9
+    - 0.05
+    - 0.05
+  bedlam2_01:
+    _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_01/image_features.pth
+    imgfeat_dir: null
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: val
+    split_seed: 42
+    split_ratios:
+    - 0.9
+    - 0.05
+    - 0.05
+  bedlam2_02:
+    _target_: hmr4d.dataset.bedlam.bedlam.Bedlam2G1Dataset
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02
+    smplx_pth_name: motion.pth
+    g1_pth_name: g1.pth
+    bbox_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/bbox.pth
+    vitpose_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/keypoints.pth
+    imgfeat_pth_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bedlam2/part_02/image_features.pth
+    imgfeat_dir: null
+    motion_frames: 120
+    min_motion_frames: 60
+    g1_input_is_yup: false
+    dof_pos_order: mjc
+    canonicalize_first_frame: true
+    floor_adjust: true
+    yaw_only_canon: true
+    split: val
+    split_seed: 42
+    split_ratios:
+    - 0.9
+    - 0.05
+    - 0.05
+endecoder:
+  _target_: hmr4d.model.offline.utils.endecoder.EnDecoder
+  stats_name: MM_V1_AMASS_LOCAL_BEDLAM_CAM
+  noise_pose_k: 10
+exp_name_base: g1_training_set
+exp_name_var: _exp1
+pipeline:
+  _target_: hmr4d.model.offline.pipeline.offline_pipeline.Pipeline
+  args_denoiser3d: ${network}
+  args:
+    endecoder_opt: ${endecoder}
+    normalize_cam_angvel: true
+    n_joints: 29
+    stats_file: data/g1_training_set_exp1_stats.npz
+    pred_cam_stats_file: data/g1_training_set_exp1_pred_cam_stats.npz
+    diffusion:
+      noise_schedule: cosine
+      schedule_sampler_type: uniform
+      sigma_small: true
+      sampler: ddim
+      ddim_eta: 0.0
+      train_timestep_respacing: ''
+      test_timestep_respacing: '50'
+      cfg_uncond_prob: 0.1
+      guidance_param: 1.0
+    weights:
+      cr_j3d: 500.0
+      cr_verts: 500.0
+      transl_c: 1.0
+      j2d: 1000.0
+      verts2d: 1000.0
+      transl_w: 1.0
+      static_conf_bce: 1.0
+      fk_vel_mse: 0.0
+      fk_acc_mse: 0.0
+      ee_vel_huber: 0.0
+      ee_acc_huber: 0.0
+      global_j3d: 0.0
+      global_vertices3d: 0.0
+      fk_j3d: 0.0
+      fk_j3d_abs: 0.0
+    robot:
+      root_body_id: 0
+      mjcf_file: unitree_description/mjcf/g1.xml
+      sampled_vertices_path: hmr4d/utils/body_model/g1_sampled_vertices_384.pt
+    static_conf:
+      vel_thr: 0.15
+      body_ids:
+      - 14
+      - 15
+      - 18
+      - 19
+      - 28
+      - 29
+      vel_thr_mul:
+      - 0.9
+      - 0.9
+      - 0.9
+      - 0.9
+      - 0.8
+      - 0.8
+    geometry_loss_type: huber
+    geometry_huber_delta: 1.0

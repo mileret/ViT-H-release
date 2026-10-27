@@ -131,3 +131,41 @@ dmypy.json
 /data_preprocessing/in_context_learning.py
 
 .DS_Store
+
+# Training and runtime outputs
+outputs/
+logs/
+train_logs/
+wandb/
+lightning_logs/
+multirun/
+tmp/
+slurm-*.out
+slurm-*.err
+
+# Large model and data artifacts
+*.ckpt
+checkpoints/
+*.pth
+*.pt
+*.pkl
+*.onnx
+*.engine
+*.plan
+*.npz
+*.zip
+*.tar
+*.tar.gz
+*.tar.zst
+
+# Small release statistics included intentionally
+!data/g1_training_set_exp1_stats.npz
+!data/g1_training_set_exp1_pred_cam_stats.npz
+
+# Small code resources required at runtime
+!hmr4d/**/*.pt
+!hmr4d/**/*.pth
+!hmr4d/**/*.npz
+
+# Licensed or external inference assets
+inputs/checkpoints/

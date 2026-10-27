@@ -1,0 +1,60 @@
+# @package _global_
+defaults:
+  - /base/g1_offline_model
+  - override /optimizer: adam_2e-4
+  - override /scheduler_cfg: default
+  - override /train_datasets:
+      - training_set
+
+exp_name_base: g1_training_set
+exp_name_var: _exp1_huber_lr2e4
+exp_name: ${exp_name_base}${exp_name_var}
+data_name: g1_amass_bedlam_bedlam2_h36m_bones
+
+network:
+  imgseq_dim: 1024
+
+pipeline:
+  args:
+    stats_file: data/g1_training_set_exp1_stats.npz
+    pred_cam_stats_file: data/g1_training_set_exp1_pred_cam_stats.npz
+    geometry_loss_type: huber
+    geometry_huber_delta: 1.0
+    diffusion:
+      guidance_param: 1.0
+    weights:
+      cr_j3d: 500.0
+      cr_verts: 500.0
+      transl_c: 1.0
+      j2d: 1000.0
+      verts2d: 1000.0
+      transl_w: 1.0
+      static_conf_bce: 1.0
+      global_j3d: 0.0
+      global_vertices3d: 0.0
+      fk_j3d: 0.0
+      fk_j3d_abs: 0.0
+      fk_vel_mse: 0.0
+      fk_acc_mse: 0.0
+      ee_vel_huber: 0.0
+      ee_acc_huber: 0.0
+
+data:
+  loader_opts:
+    train:
+      batch_size: 16
+      num_workers: 8
+      source_homogeneous_batches: true
+      shuffle: true
+      seed: ${seed}
+
+pl_trainer:
+  # SourceHomogeneousBatchSampler performs DDP sharding itself.
+  devices: 1
+  strategy: auto
+  use_distributed_sampler: false
+  max_epochs: 10000
+
+logger:
+  group: ${data_name}
+  tags: [offline, g1, training_set, amass, bedlam, bedlam2, h36m, bones_seed, exp1, huber, lr2e4]

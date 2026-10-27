@@ -1,0 +1,24 @@
+# @package _global_
+defaults:
+  - /base/g1_training_set
+
+exp_name_var: _exp1_l16_d1024_h16_bs32
+exp_name: ${exp_name_base}${exp_name_var}
+
+network:
+  latent_dim: 1024
+  num_layers: 16
+  num_heads: 16
+
+data:
+  loader_opts:
+    train:
+      batch_size: 32
+
+pl_trainer:
+  devices: 8
+  strategy: ddp_find_unused_parameters_true
+  max_epochs: 10000
+
+logger:
+  tags: [offline, g1, training_set, amass, bedlam, bedlam2, h36m, bones_seed, exp1, huber, lr2e4, l16, d1024, h16, bs32]

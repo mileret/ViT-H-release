@@ -1,0 +1,102 @@
+# @package _global_
+
+
+defaults:
+    - override /data: mocap/trainX_testY
+    - override /model: offline/offline_pl
+    - override /endecoder: offline/v1_amass_local_bedlam_cam
+    - override /optimizer: adamw_2e-4
+    - override /scheduler_cfg: warmup_5_epoch_half_200_350
+    - override /train_datasets:
+          - train_dualpth
+    - override /test_datasets:
+          - val_dualpth
+    - override /callbacks:
+          - simple_ckpt_saver/every10e_top100
+          - prog_bar/prog_reporter_every0.02
+          - train_speed_timer/base
+          - lr_monitor/pl
+          - val_first_epoch/base
+    - override /network: offline/relative_transformer
+
+exp_name_base: g1_dualpth
+exp_name_var: "_v1"
+exp_name: ${exp_name_base}${exp_name_var}
+data_name: g1_amass_dualpth
+
+network:
+    output_dim: 189
+    xt_dim: 189
+    avgbeta: false
+    pred_cam_dim: 3
+    static_conf_dim: 6
+    obs_num_joints: 14
+    imgseq_dim: 0
+
+pipeline:
+    _target_: hmr4d.model.offline.pipeline.offline_pipeline.Pipeline
+    args_denoiser3d: ${network}
+    args:
+        endecoder_opt: ${endecoder}
+        normalize_cam_angvel: True
+        n_joints: 29
+        stats_file: "data/g1_stats.npz"
+        pred_cam_stats_file: "data/g1_pred_cam_stats.npz"
+
+        diffusion:
+            noise_schedule: cosine
+            schedule_sampler_type: uniform
+            sigma_small: true
+            sampler: ddim
+            ddim_eta: 0.0
+            train_timestep_respacing: ""
+            test_timestep_respacing: "50"
+            cfg_uncond_prob: 0.1
+            guidance_param: 2.5
+        weights:
+            cr_j3d: 500.0
+            cr_verts: 500.0
+            transl_c: 1.0
+            j2d: 1000.0
+            verts2d: 1000.0
+            transl_w: 1.0
+            static_conf_bce: 1.0
+
+        robot:
+            root_body_id: 0
+            mjcf_file: "unitree_description/mjcf/g1.xml"
+            sampled_vertices_path: "hmr4d/utils/body_model/g1_sampled_vertices_384.pt"
+
+        static_conf:
+            vel_thr: 0.15
+            body_ids: [14, 15, 18, 19, 28, 29]
+            vel_thr_mul: [0.9, 0.9, 0.9, 0.9, 0.8, 0.8]
+
+data:
+    loader_opts:
+        train:
+            batch_size: 32
+            num_workers: 12
+
+pl_trainer:
+    precision: bf16-mixed
+    log_every_n_steps: 50
+    gradient_clip_val: 0.5
+    max_epochs: 500
+    check_val_every_n_epoch: 10
+    devices: 1
+
+logger:
+    _target_: pytorch_lightning.loggers.WandbLogger
+    project: offline
+    name: ${exp_name}
+    save_dir: ${output_dir}
+    offline: false
+    log_model: false
+    job_type: train
+    group: ${data_name}
+    tags:
+        - offline
+        - amass
+        - g1
+        - dualpth

@@ -1,0 +1,19 @@
+amass:
+  _target_: hmr4d.dataset.pure_motion.g1_amass.G1AmassDualPthDataset
+  amass_pth_path: ${oc.env:VITH_AMASS_PTH,amass.pth}
+  g1_pth_path:    ${oc.env:VITH_G1_PTH,g1.pth}
+  g1_input_is_yup: true
+  amass_fps: 30.0
+  motion_frames: 120
+  cam_augmentation: "v11"
+  canonicalize_first_frame: true
+  align_target: "pelvis"
+  floor_adjust: true
+  apply_az_to_ay_g1: true
+  split: "val"
+  split_seed: 42
+  split_ratios: [0.9, 0.05, 0.05]
+  ratio_lo: [0.7, 0.7, -.inf]
+  ratio_hi: [1.05, 1.05, .inf]
+  ratio_thr: 0.1
+  skip_substrings: []
