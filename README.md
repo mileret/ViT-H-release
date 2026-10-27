@@ -32,8 +32,9 @@ pip install -e .
 
 ## Dataset
 
-The training dataset is distributed separately as four compressed archives:
-`amass`, `bedlam`, `bedlam2`, and `h36m`. Download the
+The full training set uses AMASS, BEDLAM, BEDLAM2, Human3.6M, and BONES-SEED.
+Preprocessed data for the first four sources is distributed as four compressed
+archives: `amass`, `bedlam`, `bedlam2`, and `h36m`. Download the
 [ViT-H training dataset](https://huggingface.co/datasets/eerrr1/ViT-H) and
 extract all archives into one directory.
 
