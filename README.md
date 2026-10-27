@@ -34,10 +34,12 @@ pip install -e .
 
 The training dataset is distributed separately as five compressed
 archives: `amass`, `bedlam`, `bedlam2`, `h36m`, and `bones_seed`. Download the
-private dataset repository and extract all archives into one directory:
+[ViT-H training dataset](https://huggingface.co/datasets/eerrr1/ViT-H) and
+extract all archives into one directory. The original BONES-SEED dataset is
+available from its [official Hugging Face repository](https://huggingface.co/datasets/bones-studio/seed).
 
 ```bash
-hf download <HF_DATASET_REPO> \
+hf download eerrr1/ViT-H \
   --repo-type dataset \
   --local-dir /path/to/training_set
 
@@ -49,7 +51,6 @@ done
 export VITH_DATASET_ROOT=/path/to/training_set
 ```
 
-Replace `<HF_DATASET_REPO>` with the released Hugging Face dataset identifier.
 The extracted layout is documented in [docs/DATA_LAYOUT.md](docs/DATA_LAYOUT.md).
 Dataset components and body-model assets may have terms separate from this
 repository's code license.
