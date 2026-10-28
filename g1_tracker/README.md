@@ -47,6 +47,27 @@ python tools/track_g1.py \
 whose initial foot-contact spheres define the support-plane offset. Using a
 different robot definition changes the rollout and is not equivalent.
 
+### Optional MuJoCo video
+
+Add `--render-video` to render the tracked result after the rollout:
+
+```bash
+MUJOCO_GL=egl python tools/track_g1.py \
+  --input outputs/example/motion.npz \
+  --output outputs/example/tracked_motion.npz \
+  --input-fps 30 \
+  --policy-onnx assets/tracker/model_step_020000_g1.onnx \
+  --xml-path assets/tracker/scene_29dof_mujoco.xml \
+  --grounding-xml assets/tracker/g1_29dof_rev_1_0.xml \
+  --render-video
+```
+
+The default video path is `outputs/example/tracked_motion.mp4`. Use
+`--video-output`, `--video-width`, and `--video-height` to override it. Batched
+inputs produce one file per sample with `_sample_000`, `_sample_001`, and so on.
+`MUJOCO_GL=egl` is recommended on headless Linux nodes; omit it on a desktop if
+the default OpenGL backend works.
+
 ## Output
 
 The output NPZ contains:

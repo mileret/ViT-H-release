@@ -25,6 +25,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input-fps", type=float)
     parser.add_argument("--control-hz", type=float, default=50.0)
     parser.add_argument("--ort-threads", type=int, default=1)
+    parser.add_argument(
+        "--render-video",
+        action="store_true",
+        help="Render the tracked motion to an MP4 file with MuJoCo.",
+    )
+    parser.add_argument(
+        "--video-output",
+        type=Path,
+        help="Video path; defaults to the NPZ output path with an .mp4 suffix.",
+    )
+    parser.add_argument("--video-width", type=int, default=640)
+    parser.add_argument("--video-height", type=int, default=480)
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -43,10 +55,17 @@ def main() -> None:
         input_fps=args.input_fps,
         control_hz=args.control_hz,
         ort_threads=args.ort_threads,
+        render_video=args.render_video,
+        video_output=args.video_output,
+        video_width=args.video_width,
+        video_height=args.video_height,
     )
     succeeded = int(result["is_success"].sum())
     total = int(result["is_success"].size)
     print(f"saved {output} ({succeeded}/{total} successful)")
+    if args.render_video:
+        video = args.video_output or output.with_suffix(".mp4")
+        print(f"rendered video from {video.expanduser().resolve()}")
 
 
 if __name__ == "__main__":

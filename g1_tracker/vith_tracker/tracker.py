@@ -700,6 +700,75 @@ def atomic_npz(path: Path, values: dict[str, np.ndarray]) -> None:
     np.savez_compressed(temporary, **values)
     os.replace(temporary, path)
 
+
+def _sample_video_path(path: Path, sample_index: int, sample_count: int) -> Path:
+    if sample_count == 1:
+        return path
+    return path.with_name(f"{path.stem}_sample_{sample_index:03d}{path.suffix}")
+
+
+def render_rollout_video(
+    rollout: dict[str, np.ndarray],
+    xml_path: Path,
+    output_path: Path,
+    fps: float,
+    width: int = 640,
+    height: int = 480,
+) -> None:
+    if width <= 0 or height <= 0:
+        raise ValueError(f"video dimensions must be positive, got {width}x{height}")
+    if output_path.suffix.lower() != ".mp4":
+        raise ValueError("video output must use the .mp4 extension")
+
+    try:
+        import imageio.v2 as imageio
+    except ImportError as error:
+        raise RuntimeError(
+            "video rendering requires imageio and imageio-ffmpeg"
+        ) from error
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_name(f".{output_path.stem}.tmp.mp4")
+    model, _ = load_isaac_aligned_mujoco_model(xml_path)
+    data = mujoco.MjData(model)
+    renderer = None
+    writer = None
+    failed = False
+    try:
+        renderer = mujoco.Renderer(model, height=height, width=width)
+        camera = mujoco.MjvCamera()
+        camera.azimuth = 135.0
+        camera.elevation = -15.0
+        camera.distance = 3.0
+        writer = imageio.get_writer(
+            temporary,
+            fps=fps,
+            codec="libx264",
+            pixelformat="yuv420p",
+            macro_block_size=None,
+        )
+        frames = int(rollout["joint_pos"].shape[0])
+        for frame in range(frames):
+            data.qpos[:3] = rollout["root_pos_w"][frame]
+            data.qpos[3:7] = normalize_quat(rollout["root_quat_w"][frame])
+            data.qpos[7:] = rollout["joint_pos"][frame, ISAACLAB_TO_MUJOCO]
+            data.qvel[:] = 0.0
+            mujoco.mj_forward(model, data)
+            camera.lookat[:] = data.qpos[:3]
+            renderer.update_scene(data, camera=camera)
+            writer.append_data(renderer.render())
+    except Exception:
+        failed = True
+        raise
+    finally:
+        if writer is not None:
+            writer.close()
+        if renderer is not None:
+            renderer.close()
+        if failed and temporary.exists():
+            temporary.unlink()
+    os.replace(temporary, output_path)
+
 REQUIRED_INPUT_FIELDS = ("joint_pos", "root_pos_w", "root_quat_w", "body_pos_w")
 
 
@@ -755,6 +824,10 @@ def track_file(
     input_fps: float | None = None,
     control_hz: float = 50.0,
     ort_threads: int = 1,
+    render_video: bool = False,
+    video_output: Path | None = None,
+    video_width: int = 640,
+    video_height: int = 480,
 ) -> dict[str, np.ndarray]:
     paths = [Path(path).expanduser().resolve() for path in (
         input_path, policy_onnx, xml_path, grounding_xml
@@ -764,6 +837,8 @@ def track_file(
             raise FileNotFoundError(path)
     input_path, policy_onnx, xml_path, grounding_xml = paths
     output_path = Path(output_path).expanduser().resolve()
+    if video_output is not None and not render_video:
+        raise ValueError("video_output requires render_video=True")
     with np.load(input_path, allow_pickle=False) as payload:
         raw_values = {key: np.asarray(payload[key]).copy() for key in payload.files}
     fps = _resolve_fps(raw_values, input_fps)
@@ -819,4 +894,22 @@ def track_file(
         tracker_protocol_version=np.asarray(TRACKER_PROTOCOL_VERSION, dtype=np.int16),
     )
     atomic_npz(output_path, result)
+    if render_video:
+        base_video_path = (
+            output_path.with_suffix(".mp4")
+            if video_output is None
+            else Path(video_output).expanduser().resolve()
+        )
+        for sample_index in range(samples):
+            destination = _sample_video_path(
+                base_video_path, sample_index, samples
+            )
+            render_rollout_video(
+                {key: result[key][sample_index] for key in REQUIRED_INPUT_FIELDS},
+                xml_path=xml_path,
+                output_path=destination,
+                fps=fps,
+                width=video_width,
+                height=video_height,
+            )
     return result
