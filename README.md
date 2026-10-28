@@ -78,9 +78,22 @@ inputs/checkpoints/
         └── SMPLX_{GENDER}.npz
 ```
 
-The ViT-H checkpoint repository contains the released offline model, YOLO,
-ViTPose, HMR2, and the optional DPVO weights. Download it into the project root
-so that the files follow this layout:
+The [ViT-H checkpoint repository](https://huggingface.co/datasets/eerrr1/ViT-H-checkpoints)
+contains the released offline model, YOLO, ViTPose, HMR2, and the optional DPVO
+weights. Download the required files into the project root:
+
+```bash
+hf download eerrr1/ViT-H-checkpoints \
+  vith_offline_g1.ckpt \
+  inputs/checkpoints/dpvo/dpvo.pth \
+  inputs/checkpoints/hmr2/epoch=10-step=25000.ckpt \
+  inputs/checkpoints/vitpose/vitpose-h-multi-coco.pth \
+  inputs/checkpoints/yolo/yolov8x.pt \
+  --repo-type dataset \
+  --local-dir .
+```
+
+The downloaded files follow this layout:
 
 ```text
 vith_offline_g1.ckpt

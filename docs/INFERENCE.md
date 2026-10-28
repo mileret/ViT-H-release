@@ -5,8 +5,22 @@
 The trained checkpoint is not distributed in this repository. Store it outside
 the repository and pass its path through `--ckpt`.
 
-The released training and inference pipeline uses SAM3D image features. It
-expects the following files from the ViT-H checkpoint repository:
+The released training and inference pipeline uses SAM3D image features. Download
+the ViT-H model and preprocessing weights from the
+[checkpoint repository](https://huggingface.co/datasets/eerrr1/ViT-H-checkpoints):
+
+```bash
+hf download eerrr1/ViT-H-checkpoints \
+  vith_offline_g1.ckpt \
+  inputs/checkpoints/dpvo/dpvo.pth \
+  inputs/checkpoints/hmr2/epoch=10-step=25000.ckpt \
+  inputs/checkpoints/vitpose/vitpose-h-multi-coco.pth \
+  inputs/checkpoints/yolo/yolov8x.pt \
+  --repo-type dataset \
+  --local-dir .
+```
+
+This creates the following files:
 
 ```text
 vith_offline_g1.ckpt
