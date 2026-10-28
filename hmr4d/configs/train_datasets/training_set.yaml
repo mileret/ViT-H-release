@@ -206,7 +206,6 @@ bones_seed:
   split: train
   split_seed: 42
   split_ratios: [0.9, 0.05, 0.05]
-  # Bones Seed exporter contract is BYD order. Unlike BEDLAM/H36M, this
-  # source must not pass through the MJC->BYD permutation a second time.
+  # The converter stores all 29 joint channels in BYD order.
   dof_pos_order: byd
   soma_obs_indices: [6, 7, 9, 15, 10, 16, 11, 17, 20, 24, 21, 25, 22, 26]

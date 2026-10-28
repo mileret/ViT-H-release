@@ -46,6 +46,7 @@ ViT-H-release/
 |   `-- train.sbatch
 |-- tools/
 |   |-- train.py
+|   |-- prepare_bones_seed.py
 |   |-- infer_video.py
 |   |-- inference_utils.py
 |   `-- video_preprocess.py
@@ -62,6 +63,8 @@ ViT-H-release/
   configuration; its direct inheritance fragments are under
   `hmr4d/configs/base/`.
 - `tools/train.py`: Lightning/Hydra training entry point.
+- `tools/prepare_bones_seed.py`: converts the official proportional SOMA BVH
+  and G1 CSV pairs into the BONES-SEED training shards and index.
 - `tools/infer_video.py`: video-to-G1 offline inference entry point.
 - `tools/inference_utils.py`: checkpoint loading and output-angle utilities.
 - `tools/video_preprocess.py`: tracking, pose, feature, and camera preprocessing.

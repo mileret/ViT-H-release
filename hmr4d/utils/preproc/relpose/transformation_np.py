@@ -2,7 +2,7 @@ import numpy as np
 
 
 def rotation_matrix_to_quaternion(R):
-    'Documentation removed.'
+    """Convert a 3x3 rotation matrix to a wxyz quaternion."""
     m00, m01, m02 = R[0, 0], R[0, 1], R[0, 2]
     m10, m11, m12 = R[1, 0], R[1, 1], R[1, 2]
     m20, m21, m22 = R[2, 0], R[2, 1], R[2, 2]
@@ -36,7 +36,7 @@ def rotation_matrix_to_quaternion(R):
 
 
 def quaternion_to_rotation_matrix(q):
-    'Documentation removed.'
+    """Convert a wxyz quaternion to a 3x3 rotation matrix."""
     qw, qx, qy, qz = q
     R = np.array(
         [
@@ -49,7 +49,7 @@ def quaternion_to_rotation_matrix(q):
 
 
 def slerp(q0, q1, t):
-    'Documentation removed.'
+    """Spherically interpolate between two quaternions."""
     dot = np.dot(q0, q1)
     
     if dot < 0.0:
@@ -75,7 +75,7 @@ def slerp(q0, q1, t):
 
 
 def lerp_missing_frames(T_w2c_list, sample_idxs):
-    'Documentation removed.'
+    """Interpolate sampled camera transforms to all intermediate frames."""
     sample_idxs = np.array(sample_idxs)
     
     F_all = sample_idxs[-1] + 1

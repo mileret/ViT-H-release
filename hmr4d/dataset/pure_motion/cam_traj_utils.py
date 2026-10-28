@@ -449,7 +449,7 @@ class CameraAugmentorV11:
 
 
 class StaticCameraV11:
-    'Documentation removed.'
+    """Create a deterministic static camera that keeps the subject visible."""
 
     def __init__(self, seed: int = 0):
         
@@ -462,7 +462,7 @@ class StaticCameraV11:
         self.seed = int(seed)
 
     def __call__(self, w_j3d, length=None):
-        'Documentation removed.'
+        """Return one static world-to-camera transform per input frame."""
         L = int(length) if length is not None else int(w_j3d.shape[0])
         assert w_j3d.size(0) == L, f"w_j3d.shape[0]={w_j3d.shape[0]} != length={L}"
 

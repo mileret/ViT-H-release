@@ -30,4 +30,34 @@ if [[ "$WANDB_MODE" == "online" ]]; then
   logger_args=("logger.offline=false" "+logger.entity=$WANDB_ENTITY")
 fi
 
-exec "$PYTHON_BIN" -u tools/train.py   exp=offline/g1_training_set_exp1   exp_name=g1_training_set_exp1   'train_datasets.amass_00.split_ratios=[1.0,0.0,0.0]'   'train_datasets.amass_01.split_ratios=[1.0,0.0,0.0]'   'train_datasets.bedlam2_00.split_ratios=[1.0,0.0,0.0]'   'train_datasets.bedlam2_01.split_ratios=[1.0,0.0,0.0]'   'train_datasets.bedlam2_02.split_ratios=[1.0,0.0,0.0]'   'train_datasets.bedlam_00.split_ratios=[1.0,0.0,0.0]'   'train_datasets.bedlam_01.split_ratios=[1.0,0.0,0.0]'   'train_datasets.h36m_00.split_ratios=[1.0,0.0,0.0]'   'train_datasets.h36m_01.split_ratios=[1.0,0.0,0.0]'   'train_datasets.bones_seed.split_ratios=[1.0,0.0,0.0]'   train_datasets.bones_seed.dof_pos_order=byd   ckpt_path=null   resume_mode=null   pl_trainer.devices="$NUM_DEVICES"   pl_trainer.strategy="$TRAIN_STRATEGY"   pl_trainer.max_epochs=10000   pl_trainer.log_every_n_steps=1   pl_trainer.use_distributed_sampler=false   data.loader_opts.train.batch_size=32   data.loader_opts.train.num_workers=1   data.loader_opts.train.source_homogeneous_batches=false   +data.loader_opts.train.source_mixed_batches=true   "${logger_args[@]}"   "$@"
+dataset_args=(
+  'train_datasets.amass_00.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.amass_01.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bedlam2_00.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bedlam2_01.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bedlam2_02.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bedlam_00.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bedlam_01.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.h36m_00.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.h36m_01.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bones_seed.split_ratios=[1.0,0.0,0.0]'
+  'train_datasets.bones_seed.dof_pos_order=byd'
+)
+
+exec "$PYTHON_BIN" -u tools/train.py \
+  exp=offline/g1_training_set_exp1 \
+  exp_name=g1_training_set_exp1 \
+  "${dataset_args[@]}" \
+  ckpt_path=null \
+  resume_mode=null \
+  pl_trainer.devices="$NUM_DEVICES" \
+  pl_trainer.strategy="$TRAIN_STRATEGY" \
+  pl_trainer.max_epochs=10000 \
+  pl_trainer.log_every_n_steps=1 \
+  pl_trainer.use_distributed_sampler=false \
+  data.loader_opts.train.batch_size=32 \
+  data.loader_opts.train.num_workers=1 \
+  data.loader_opts.train.source_homogeneous_batches=false \
+  +data.loader_opts.train.source_mixed_batches=true \
+  "${logger_args[@]}" \
+  "$@"

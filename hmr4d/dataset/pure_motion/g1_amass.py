@@ -117,7 +117,7 @@ def slerp_sequence_quat(q_seq, tgt_len):
 
 # ==========================================================
 def npz_get(npz_obj, candidates, required=True, file_for_log=""):
-    'Documentation removed.'
+    """Return the first available key from an NPZ file."""
     for k in candidates:
         if k in npz_obj.files:
             return npz_obj[k]
@@ -133,14 +133,14 @@ def npz_get(npz_obj, candidates, required=True, file_for_log=""):
 
 # ==========================================================
 def interpolate_tensor(x, tgt_len):
-    'Documentation removed.'
+    """Linearly resample a (T, C) tensor to ``tgt_len`` frames."""
     x = x.unsqueeze(0).transpose(1, 2)  # (1, C, T)
     x_interp = F.interpolate(x, size=tgt_len, mode="linear", align_corners=True)
     return x_interp.transpose(1, 2).squeeze(0)  # (tgt_len, C)
 
 
 def interpolate_seq(x, tgt_len):
-    'Documentation removed.'
+    """Linearly resample a sequence with arbitrary trailing dimensions."""
     T = x.shape[0]
     x_flat = x.reshape(T, -1)
     x_interp = interpolate_tensor(x_flat, tgt_len)
@@ -168,12 +168,12 @@ def retime_speed_ratio(src_len, tgt_len, src_fps=None, tgt_fps=None):
 
 
 def quat_xyzw_to_wxyz(q):
-    'Documentation removed.'
+    """Convert quaternions from xyzw to wxyz order."""
     return torch.cat([q[..., 3:4], q[..., 0:3]], dim=-1)
 
 
 def quat_wxyz_to_xyzw(q):
-    'Documentation removed.'
+    """Convert quaternions from wxyz to xyzw order."""
     return torch.cat([q[..., 1:4], q[..., 0:1]], dim=-1)
 
 
@@ -243,7 +243,7 @@ def get_smplx_foot_buffers(
     smplx_path="inputs/checkpoints/body_models/smplx/SMPLX_NEUTRAL.npz",
     num_betas=10,
 ):
-    'Documentation removed.'
+    """Load and cache SMPL-X foot-joint template data."""
     key = (str(smplx_path), int(num_betas))
     if key in _SMPLX_FOOT_CACHE:
         return _SMPLX_FOOT_CACHE[key]
@@ -260,7 +260,7 @@ def get_smplx_foot_buffers(
 
 def compute_smpl_floor_height(betas, J_template_pelvis, J_shapedirs_pelvis,
                                J_template_feet, J_shapedirs_feet):
-    'Documentation removed.'
+    """Estimate floor height from the shaped pelvis and foot joints."""
     pelvis_y = float((J_template_pelvis + J_shapedirs_pelvis @ betas)[1])
     feet_pos  = J_template_feet + torch.einsum("jcb,b->jc", J_shapedirs_feet, betas)
     min_foot_y = float(feet_pos[:, 1].min())
@@ -270,7 +270,7 @@ def compute_smpl_floor_height(betas, J_template_pelvis, J_shapedirs_pelvis,
 
 
 def apply_smpl_to_g1_axes_on_smpl(global_orient_aa, transl, pelvis_offset_smpl=None):
-    'Documentation removed.'
+    """Rotate SMPL world-space root parameters into the robot frame."""
     R_post = R_SMPL_LOCAL_TO_G1_LOCAL.to(device=transl.device, dtype=transl.dtype)
     R_orient = axis_angle_to_matrix(global_orient_aa)
     R_orient_new = R_post.unsqueeze(0) @ R_orient
@@ -296,7 +296,7 @@ def get_smplx_pelvis_buffers(
     smplx_path="inputs/checkpoints/body_models/smplx/SMPLX_NEUTRAL.npz",
     num_betas=10,
 ):
-    'Documentation removed.'
+    """Load and cache the SMPL-X pelvis template and shape directions."""
     key = (str(smplx_path), int(num_betas))
     if key in _SMPLX_PELVIS_CACHE:
         return _SMPLX_PELVIS_CACHE[key]
@@ -315,7 +315,7 @@ def get_smplx_pelvis_buffers(
 
 
 def compute_smpl_pelvis_offset(betas, J_template_pelvis, J_shapedirs_pelvis):
-    'Documentation removed.'
+    """Compute the shaped pelvis offset for one or more beta vectors."""
     return J_template_pelvis + torch.einsum("...b, cb -> ...c", betas, J_shapedirs_pelvis)
 
 
@@ -334,7 +334,7 @@ def compute_smpl_pelvis_offset(betas, J_template_pelvis, J_shapedirs_pelvis):
 
 # ==========================================================
 def _first_frame_inv_rot(R0, yaw_only=False, up_axis=1, fwd_axis=2):
-    'Documentation removed.'
+    """Return the rotation that removes the first-frame pose or heading."""
     if not yaw_only:
         return R0.transpose(-1, -2)
     fwd = R0[:, fwd_axis]                                  
@@ -351,7 +351,7 @@ def _first_frame_inv_rot(R0, yaw_only=False, up_axis=1, fwd_axis=2):
 
 def canonicalize_smpl_first_frame(global_orient_aa, transl, pelvis_offset=None,
                                   yaw_only=False, up_axis=1, fwd_axis=2):
-    'Documentation removed.'
+    """Canonicalize an SMPL sequence relative to its first frame."""
     R = axis_angle_to_matrix(global_orient_aa)            # (F, 3, 3)
     R0_inv = _first_frame_inv_rot(R[0], yaw_only=yaw_only, up_axis=up_axis, fwd_axis=fwd_axis)  # (3, 3)
     R_new = R0_inv @ R                                    # (F, 3, 3)
@@ -364,7 +364,7 @@ def canonicalize_smpl_first_frame(global_orient_aa, transl, pelvis_offset=None,
 
 
 def canonicalize_g1_first_frame(g1, root_body_id=0, yaw_only=False, up_axis=2, fwd_axis=0):
-    'Documentation removed.'
+    """Canonicalize robot world-space poses relative to the first frame."""
     body_quat_w   = g1["body_quat_w"]                                  # (F, N, 4) wxyz
     body_pos_w    = g1["body_pos_w"]                                   # (F, N, 3)
 
@@ -397,7 +397,7 @@ def canonicalize_g1_first_frame(g1, root_body_id=0, yaw_only=False, up_axis=2, f
 
 # ==========================================================
 def interpolate_g1_params(g1_data, tgt_len, speed_ratio=1.0, fps_out=None):
-    'Documentation removed.'
+    """Resample robot poses and velocities to a target frame count."""
     speed_ratio = float(speed_ratio)
 
     # --- joint DOFs and positions: linear ---
@@ -501,8 +501,8 @@ class G1AmassDataset(BaseDataset):
     
     # =====================================================
     def _load_dataset(self):
-        Log.info('Documentation removed.')
-        Log.info('Documentation removed.')
+        Log.info(f"[{self.dataset_name}] scanning AMASS files in {self.amass_dir}")
+        Log.info(f"[{self.dataset_name}] scanning robot files in {self.g1_dir}")
 
         amass_files = {f.name for f in self.amass_dir.glob("*.npz")}
         g1_files = {f.name for f in self.g1_dir.glob("*.npz")}
@@ -512,15 +512,19 @@ class G1AmassDataset(BaseDataset):
         amass_only = amass_files - g1_files
         g1_only = g1_files - amass_files
         if amass_only:
-            Log.warning('Documentation removed.')
+            Log.warning(
+                f"[{self.dataset_name}] {len(amass_only)} AMASS files have no robot pair"
+            )
         if g1_only:
-            Log.warning('Documentation removed.')
+            Log.warning(
+                f"[{self.dataset_name}] {len(g1_only)} robot files have no AMASS pair"
+            )
 
         self.paired_files = [
             {"amass": self.amass_dir / name, "g1": self.g1_dir / name, "name": Path(name).stem}
             for name in paired_names
         ]
-        Log.info('Documentation removed.')
+        Log.info(f"[{self.dataset_name}] paired files={len(self.paired_files)}")
 
     # =====================================================
     
@@ -567,12 +571,13 @@ class G1AmassDataset(BaseDataset):
             }
             self.idx2meta.extend([meta] * num_samples)
 
-        Log.info('Documentation removed.')
+        Log.info(
+            f"[{self.dataset_name}] samples={len(self.idx2meta)} skipped={skipped}"
+        )
         if amass_fps_missing > 0:
             Log.warning(
-                'Documentation removed.'
-                'Documentation removed.'
-                'Documentation removed.'
+                f"[{self.dataset_name}] {amass_fps_missing} AMASS files do not "
+                "declare an FPS value; using 120 FPS."
             )
 
     # =====================================================
@@ -643,10 +648,8 @@ class G1AmassDataset(BaseDataset):
             missing = [k for k in required_g1_keys if k not in g1_raw.files]
             if missing:
                 raise KeyError(
-                    'Documentation removed.'
-                    'Documentation removed.'
-                    'Documentation removed.'
-                    'Documentation removed.'
+                    f"Missing robot arrays {missing} in {meta['g1_file']}; "
+                    f"available keys: {list(g1_raw.files)}"
                 )
 
             g1_data = {
@@ -807,12 +810,12 @@ import re
 
 
 def _normalize_underscores(s):
-    'Documentation removed.'
+    """Collapse repeated underscores for robust filename matching."""
     return re.sub(r"_+", "_", s)
 
 
 def _candidates_from_pth_key(k):
-    'Documentation removed.'
+    """Build normalized filename candidates from a motion dictionary key."""
     parts = k.split("/")
     cands = set()
     cands.add("_".join(parts[3:]))      
@@ -822,7 +825,7 @@ def _candidates_from_pth_key(k):
 
 
 class G1AmassPthDataset(BaseDataset):
-    'Documentation removed.'
+    """Load AMASS motions from a PTH mapping and paired robot NPZ files."""
 
     def __init__(
         self,
@@ -876,12 +879,12 @@ class G1AmassPthDataset(BaseDataset):
         
         ratio_lo = tuple(float(v) for v in ratio_lo)
         ratio_hi = tuple(float(v) for v in ratio_hi)
-        assert len(ratio_lo) == 3 and len(ratio_hi) == 3, 'Documentation removed.'
+        assert len(ratio_lo) == 3 and len(ratio_hi) == 3, "ratio bounds must have three axes"
         self.ratio_lo = ratio_lo
         self.ratio_hi = ratio_hi
         self.ratio_thr = float(ratio_thr)
         self.ratio_n_retry = int(ratio_n_retry)
-        assert self.ratio_n_retry >= 1, 'Documentation removed.'
+        assert self.ratio_n_retry >= 1, "ratio_n_retry must be at least one"
         self._ratio_stats = {"accept": 0, "retry": 0, "skip": 0}
         assert align_target in ("pelvis", "transl"), align_target
         self.align_target = align_target
@@ -907,12 +910,12 @@ class G1AmassPthDataset(BaseDataset):
         super().__init__(cam_augmentation, limit_size)
 
     def _load_dataset(self):
-        Log.info('Documentation removed.')
+        Log.info(f"[{self.dataset_name}] loading motions from {self.pth_path}")
         tic = Log.time()
         self.motion_files = torch.load(self.pth_path, weights_only=False)
         Log.info(
-            'Documentation removed.'
-            'Documentation removed.'
+            f"[{self.dataset_name}] loaded {len(self.motion_files)} motions "
+            f"in {Log.time() - tic:.2f}s"
         )
 
         
@@ -929,13 +932,13 @@ class G1AmassPthDataset(BaseDataset):
                 else:
                     self._g1name_to_pth_key[c] = k
         Log.info(
-            'Documentation removed.'
-            'Documentation removed.'
-            f"(skip_substrings={self.skip_substrings})"
+            f"[{self.dataset_name}] indexed={len(self._g1name_to_pth_key)} "
+            f"ambiguous={ambiguous} skipped={skipped} "
+            f"skip_substrings={self.skip_substrings}"
         )
 
         
-        Log.info('Documentation removed.')
+        Log.info(f"[{self.dataset_name}] scanning robot files in {self.g1_dir}")
         g1_files = sorted(self.g1_dir.glob("*.npz"))
 
         self.paired_files = []
@@ -951,12 +954,12 @@ class G1AmassPthDataset(BaseDataset):
             )
 
         Log.info(
-            'Documentation removed.'
+            f"[{self.dataset_name}] paired files={len(self.paired_files)}"
         )
         if unmatched:
             Log.warning(
-                'Documentation removed.'
-                'Documentation removed.'
+                f"[{self.dataset_name}] unmatched robot files={len(unmatched)}; "
+                f"examples={unmatched[:5]}"
             )
 
     def _get_idx2meta(self):
@@ -1025,8 +1028,7 @@ class G1AmassPthDataset(BaseDataset):
                 pass
 
         Log.info(
-            'Documentation removed.'
-            'Documentation removed.'
+            f"[{self.dataset_name}] samples={len(self.idx2meta)} skipped={skipped}"
         )
 
     def _load_data(self, idx):
@@ -1071,7 +1073,7 @@ class G1AmassPthDataset(BaseDataset):
             missing = [k for k in required_g1_keys if k not in g1_raw.files]
             if missing:
                 raise KeyError(
-                    'Documentation removed.'
+                    f"Missing robot arrays {missing} in {meta['g1_file']}"
                 )
             g1_full_src = {
                 "fps": torch.tensor(g1_fps_src, dtype=torch.float32),
@@ -1238,7 +1240,7 @@ class G1AmassPthDataset(BaseDataset):
     # Root translation ratio filter
     # ----------------------------------------------------------
     def _root_axis_ratios(self, data):
-        'Documentation removed.'
+        """Compute per-axis least-squares robot-to-human translation ratios."""
         transl = data["transl"]                                # (F, 3) AMASS pelvis-mode transl
         g1_pos = data["g1_body_pos_w"][:, self.root_body_id]   # (F, 3) G1 root link
         a_delta = (transl     - transl[0:1]).detach().cpu().numpy()
@@ -1298,8 +1300,8 @@ class G1AmassPthDataset(BaseDataset):
                 break
         
         Log.warning(
-            'Documentation removed.'
-            'Documentation removed.'
+            f"[{self.dataset_name}] ratio filter rejected every candidate from "
+            f"start_idx={start_idx}; using idx={last_idx}"
         )
         return self._process_data(last_data, last_idx)
 
@@ -1457,12 +1459,12 @@ def _apply_ry_neg90_on_axis_angle(axis_angle):
 
 
 def _byd_to_mjc(dof_byd):
-    'Documentation removed.'
+    """Reorder 29 joint channels from BYD to MuJoCo order."""
     return dof_byd[..., _BYD_TO_MJC]
 
 
 def _dof_to_pose_aa(dof_mjc, root_rot_wxyz, g5_axis_mjc):
-    'Documentation removed.'
+    """Convert robot joint angles and root rotation to axis-angle poses."""
     leading = dof_mjc.shape[:-1]                                  # e.g. (B, F)
     dof_aa = g5_axis_mjc.to(dof_mjc.device, dof_mjc.dtype) * dof_mjc[..., None]  # (..., 29, 3)
     root_aa = matrix_to_axis_angle(quaternion_to_matrix(root_rot_wxyz))           # (..., 3)
@@ -1482,7 +1484,7 @@ def _get_urdf_dfs_to_byd_body():
 
 _HUMANOID_BATCH_CACHE = {}
 def _get_humanoid_batch(device):
-    'Documentation removed.'
+    """Return a cached forward-kinematics model for the requested device."""
     key = str(device)
     if key not in _HUMANOID_BATCH_CACHE:
         from motion_lib.torch_h1_humanoid_batch import Humanoid_Batch
@@ -1495,7 +1497,7 @@ def _get_humanoid_batch(device):
 
 
 def fk_g1_pth_slice(dof_byd, root_pos_z, root_rot_wxyz_z, device=None):
-    'Documentation removed.'
+    """Run robot forward kinematics and return BYD-ordered body poses."""
     if device is None:
         device = dof_byd.device
     dof_byd        = dof_byd.to(device).float()
@@ -1520,7 +1522,7 @@ def fk_g1_pth_slice(dof_byd, root_pos_z, root_rot_wxyz_z, device=None):
 
 
 def _finite_diff_lin_vel(x, fps):
-    'Documentation removed.'
+    """Compute finite-difference linear velocity and repeat the last frame."""
     if x.shape[0] < 2:
         return torch.zeros_like(x)
     diff = (x[1:] - x[:-1]) * float(fps)
@@ -1528,7 +1530,7 @@ def _finite_diff_lin_vel(x, fps):
 
 
 def _finite_diff_ang_vel(q_wxyz, fps):
-    'Documentation removed.'
+    """Compute world-frame angular velocity from wxyz quaternions."""
     if q_wxyz.shape[0] < 2:
         return torch.zeros(q_wxyz.shape[0], q_wxyz.shape[1], 3,
                            device=q_wxyz.device, dtype=q_wxyz.dtype)
@@ -1541,7 +1543,7 @@ def _finite_diff_ang_vel(q_wxyz, fps):
 
 # ==========================================================
 class G1AmassDualPthDataset(BaseDataset):
-    'Documentation removed.'
+    """Load aligned human and robot motions from paired PTH mappings."""
 
     def __init__(
         self,
@@ -1611,7 +1613,7 @@ class G1AmassDualPthDataset(BaseDataset):
         self.floor_adjust   = floor_adjust
         self.yaw_only_canon = bool(yaw_only_canon)
         assert split in ("train", "val", "test"), split
-        assert abs(sum(split_ratios) - 1.0) < 1e-6, 'Documentation removed.'
+        assert abs(sum(split_ratios) - 1.0) < 1e-6, "split_ratios must sum to one"
         self.split          = split
         self.split_seed     = int(split_seed)
         self.split_ratios   = tuple(float(r) for r in split_ratios)
@@ -1647,16 +1649,18 @@ class G1AmassDualPthDataset(BaseDataset):
         
         self.full_sequence = bool(full_sequence) and split != "train"
         if bool(full_sequence) and split == "train":
-            Log.warning('Documentation removed.'
-                        'Documentation removed.')
+            Log.warning(
+                f"[{self.dataset_name}] full_sequence is ignored for the training split"
+            )
         
         self.amass_only = bool(amass_only) and split != "train"
         if bool(amass_only) and split == "train":
-            Log.warning('Documentation removed.'
-                        'Documentation removed.')
+            Log.warning(
+                f"[{self.dataset_name}] amass_only is ignored for the training split"
+            )
         
         if subset_split is not None or subset_n is not None:
-            assert split != "train", 'Documentation removed.'
+            assert split != "train", "subset evaluation is only available for val/test"
             if subset_split is not None:
                 assert subset_split in ("train", "val", "test"), f"bad subset_split={subset_split!r}"
         self.subset_split = subset_split
@@ -1669,22 +1673,24 @@ class G1AmassDualPthDataset(BaseDataset):
     
     # ------------------------------------------------------------------
     def _load_dataset(self):
-        Log.info('Documentation removed.')
+        Log.info(f"[{self.dataset_name}] loading human motions from {self.amass_pth_path}")
         self.amass_files = _torch_load_cpu_mmap(self.amass_pth_path)
         if self.amass_only:
-            Log.info('Documentation removed.')
+            Log.info(f"[{self.dataset_name}] robot ground truth disabled")
             self.g1_files = None
             common = sorted(self.amass_files.keys())
         else:
-            Log.info('Documentation removed.')
+            Log.info(f"[{self.dataset_name}] loading robot motions from {self.g1_pth_path}")
             self.g1_files = _torch_load_cpu_mmap(self.g1_pth_path)
             common = sorted(set(self.amass_files.keys()) & set(self.g1_files.keys()))
         before = len(common)
         if self.skip_substrings:
             common = [k for k in common
                       if not any(s.lower() in k.lower() for s in self.skip_substrings)]
-        Log.info('Documentation removed.'
-                 f"(skip_substrings={self.skip_substrings})")
+        Log.info(
+            f"[{self.dataset_name}] common={len(common)} filtered={before - len(common)} "
+            f"skip_substrings={self.skip_substrings}"
+        )
 
         
         rng = np.random.default_rng(self.split_seed)
@@ -1701,8 +1707,10 @@ class G1AmassDualPthDataset(BaseDataset):
         else:
             idx_sel = perm[n_train + n_val:]
         self.split_keys = [common[i] for i in idx_sel]
-        Log.info('Documentation removed.'
-                 f"(ratios={self.split_ratios}, seed={self.split_seed})")
+        Log.info(
+            f"[{self.dataset_name}] split={self.split} selected={len(self.split_keys)} "
+            f"ratios={self.split_ratios} seed={self.split_seed}"
+        )
 
         
         
@@ -1722,7 +1730,7 @@ class G1AmassDualPthDataset(BaseDataset):
                 self.split_keys = [pool[i] for i in pick]
             else:
                 self.split_keys = pool
-            Log.info('Documentation removed.')
+            Log.info(f"[{self.dataset_name}] subset selected={len(self.split_keys)}")
 
     def _get_idx2meta(self):
         self.idx2meta = []
@@ -1733,7 +1741,10 @@ class G1AmassDualPthDataset(BaseDataset):
                 
                 g1_len = int(self.g1_files[k]["root_pos"].shape[0])
                 if g1_len != length:
-                    Log.warning('Documentation removed.')
+                    Log.warning(
+                        f"[{self.dataset_name}] length mismatch for {k}: "
+                        f"human={length}, robot={g1_len}"
+                    )
                     skipped += 1
                     continue
             if length < 25:
@@ -1754,8 +1765,10 @@ class G1AmassDualPthDataset(BaseDataset):
                         "key": k, "usable_len": length, "name": Path(k).stem,
                         "seg_id": seg_id, "num_seg": num_samples,
                     })
-        Log.info('Documentation removed.'
-                 'Documentation removed.')
+        Log.info(
+            f"[{self.dataset_name}] samples={len(self.idx2meta)} skipped={skipped} "
+            f"full_sequence={self.full_sequence}"
+        )
 
     # ------------------------------------------------------------------
     
@@ -2082,8 +2095,10 @@ class G1AmassDualPthDataset(BaseDataset):
             idx = (idx + 1) % len(self.idx2meta)
             if idx == start_idx:
                 break
-        Log.warning('Documentation removed.'
-                    'Documentation removed.')
+        Log.warning(
+            f"[{self.dataset_name}] ratio filter rejected every candidate from "
+            f"start_idx={start_idx}; using idx={last_idx}"
+        )
         return self._process_data(last_data, last_idx)
 
 

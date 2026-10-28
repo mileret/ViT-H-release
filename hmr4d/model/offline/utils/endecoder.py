@@ -627,7 +627,7 @@ class EnDecoder(nn.Module):
     # --- stats for new G1 pred_x (189-D) --------------------------------
 
     def set_g1_pred_stats(self, mean: torch.Tensor, std: torch.Tensor):
-        'Documentation removed.'
+        """Register normalization statistics for the G1 prediction vector."""
         mean = mean.float().clone()
         std  = std.float().clone()
         self.register_buffer("g1_pred_mean", mean, persistent=False)

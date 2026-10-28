@@ -55,7 +55,7 @@ def get_frame_id_list_from_mask(mask):
 
 def get_batch_frame_id_lists_from_mask_BLC(masks):
     # batch=64, 0.10s
-    'Documentation removed.'
+    """Return contiguous valid-frame ranges for every batch and channel."""
     B, L, C = masks.size()
     
     padded_masks = torch.cat(

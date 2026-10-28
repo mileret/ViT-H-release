@@ -199,13 +199,12 @@ class Pipeline(nn.Module):
             except Exception as e:
                 raise RuntimeError(
                     f"[Pipeline] Failed to load pred_cam stats from {pred_cam_stats_file}: {e}. "
-                    'Documentation removed.'
-                    'Documentation removed.'
+                    "Check that the file contains compatible 'mean' and 'std' arrays."
                 ) from e
         elif hasattr(self.denoiser3d, "set_pred_cam_stats"):
             Log.warning(
-                'Documentation removed.'
-                'Documentation removed.'
+                "[Pipeline] pred_cam statistics are not configured; "
+                "camera predictions will use the model defaults."
             )
 
         if self.args.normalize_cam_angvel:
@@ -560,7 +559,7 @@ class Pipeline(nn.Module):
         return outputs
 
     def _prepare_robot_outputs_from_fk(self, inputs, pred_body_pos_w, gt_body_pos_w):
-        'Documentation removed.'
+        """Transform predicted and target robot joints into camera space."""
         root_body_id = getattr(getattr(self.args, "robot", None), "root_body_id", 0)
 
         g1_T_w2c = inputs["g1_target"]["g1_T_w2c"]   # (B,L,4,4) G1 camera
@@ -599,7 +598,7 @@ class Pipeline(nn.Module):
         )
 
     def _randomly_set_null_condition(self, f_condition, uncond_prob=0.1, skip_mask=None):
-        'Documentation removed.'
+        """Randomly drop conditioning entries for classifier-free guidance."""
         keys = list(f_condition.keys())
         for k in keys:
             if f_condition[k] is None:
@@ -623,7 +622,7 @@ class Pipeline(nn.Module):
         return f_condition
 
     def _ddim_sample(self, length, f_condition, real=None, real_motion=None):
-        'Documentation removed.'
+        """Generate a G1 motion sequence with DDIM sampling."""
         from hmr4d.model.offline.utils.endecoder import G1_PRED_X_DIM
 
         obs = f_condition["obs"]
@@ -737,7 +736,7 @@ def randomly_set_null_condition(f_condition, uncond_prob=0.1):
 
 
 def _reduce_loss(loss_el, mask_bcast, t_weights=None, fk_gate=None):
-    'Documentation removed.'
+    """Reduce an elementwise loss with masks and optional frame weights."""
     nan_count = (~torch.isfinite(loss_el)).sum().float()
 
     if fk_gate is None and t_weights is None:
@@ -1254,7 +1253,7 @@ def compute_robot_bbx_xys(
     do_augment=False,
     base_enlarge=1.2,
 ):
-    'Documentation removed.'
+    """Project robot joints and return center-size bounding boxes."""
     body_pos_c_safe = body_pos_c.clone()
     body_pos_c_safe[..., 2].clamp_(min=reproj_z_thr)
     robot_i2d = perspective_projection(body_pos_c_safe, K_fullimg)

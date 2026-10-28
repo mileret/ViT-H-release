@@ -142,7 +142,7 @@ class TwoPairSolver:
 
 
 def interpolate_missing_frames(T_w2c_list, sample_idxs):
-    'Documentation removed.'
+    """Interpolate sampled camera poses to a dense frame sequence."""
     sample_idxs = np.array(sample_idxs)
     
     F_all = sample_idxs[-1] + 1

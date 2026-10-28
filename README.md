@@ -115,9 +115,9 @@ files are obtained through Fast-SAM-3D-Body and stay inside
 
 ## Dataset
 
-The full training set uses AMASS, BEDLAM, BEDLAM2, Human3.6M, and BONES-SEED.
-Preprocessed data for the first four sources is distributed as four compressed
-archives: `amass`, `bedlam`, `bedlam2`, and `h36m`. Download the
+The released full experiment uses AMASS, BEDLAM, BEDLAM2, Human3.6M, and
+BONES-SEED. Preprocessed data for the first four sources is distributed as four
+compressed archives: `amass`, `bedlam`, `bedlam2`, and `h36m`. Download the
 [ViT-H training dataset](https://huggingface.co/datasets/eerrr1/ViT-H) and
 extract all archives into one directory.
 
@@ -140,6 +140,38 @@ repository's code license.
 
 BONES-SEED is available separately from its
 [official Hugging Face repository](https://huggingface.co/datasets/bones-studio/seed).
+Accept its gated-data license on Hugging Face, then download the proportional
+SOMA motions and the matching G1 trajectories:
+
+```bash
+hf auth login
+hf download bones-studio/seed \
+  g1.tar.gz \
+  soma_proportional.tar.gz \
+  --repo-type dataset \
+  --local-dir /path/to/bones-seed
+
+cd /path/to/bones-seed
+tar -xzf g1.tar.gz
+tar -xzf soma_proportional.tar.gz
+```
+
+Convert the official 120 FPS files to the paired 30 FPS representation used by
+the training loader. The converter matches each proportional SOMA BVH with its
+G1 CSV, converts coordinate and rotation conventions, runs G1 forward
+kinematics, writes session shards, and creates `index.json`.
+
+```bash
+cd /path/to/ViT-H-release
+python tools/prepare_bones_seed.py \
+  --source /path/to/bones-seed \
+  --output /path/to/training_set/bones_seed \
+  --workers 4
+```
+
+The full conversion is CPU- and storage-intensive. Start with `--limit 1` and
+a separate output directory if you want to validate the environment before
+converting the complete dataset.
 
 ## Training
 
@@ -152,6 +184,10 @@ export NUM_DEVICES=8
 export WANDB_MODE=offline
 bash scripts/train.sh
 ```
+
+The default training configuration uses all five sources and therefore checks
+for the converted BONES-SEED directory. The complete source and converted
+layouts are documented in [docs/DATA_LAYOUT.md](docs/DATA_LAYOUT.md).
 
 For Slurm clusters, adjust the site-specific directives in
 `slurm/train.sbatch`, export `VITH_DATASET_ROOT`, and submit:

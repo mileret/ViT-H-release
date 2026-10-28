@@ -108,7 +108,7 @@ def get_smplx_pelvis_buffers(
     smplx_path="inputs/checkpoints/body_models/smplx/SMPLX_NEUTRAL.npz",
     num_betas=10,
 ):
-    'Documentation removed.'
+    """Load and cache the SMPL-X pelvis template and shape directions."""
     key = (str(smplx_path), int(num_betas))
     if key in _SMPLX_PELVIS_CACHE:
         return _SMPLX_PELVIS_CACHE[key]
@@ -127,7 +127,7 @@ def get_smplx_pelvis_buffers(
 
 
 def compute_smpl_pelvis_offset(betas, J_template_pelvis, J_shapedirs_pelvis):
-    'Documentation removed.'
+    """Compute the shaped pelvis offset for one or more beta vectors."""
     return J_template_pelvis + torch.einsum("...b, cb -> ...c", betas, J_shapedirs_pelvis)
 
 

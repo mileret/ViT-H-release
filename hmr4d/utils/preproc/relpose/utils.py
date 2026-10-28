@@ -17,7 +17,7 @@ def visualize_matches(img0, img1, kp0, kp1, output_dir):
 
 
 def visualize_T_w2c_rotations(T_w2c_list, output_dir):
-    'Documentation removed.'
+    """Visualize camera viewing directions for a pose sequence."""
 
     
     

@@ -203,7 +203,7 @@ class SourceMixedBatchSampler:
 
 
 def _worker_init_fn(worker_id: int):
-    'Documentation removed.'
+    """Seed NumPy and Python RNGs from the PyTorch worker seed."""
     seed = (_torch.initial_seed() + worker_id) % (2 ** 32)
     _np.random.seed(seed)
     _py_random.seed(seed)
