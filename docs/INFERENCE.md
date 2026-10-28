@@ -5,30 +5,79 @@
 The trained checkpoint is not distributed in this repository. Store it outside
 the repository and pass its path through `--ckpt`.
 
-The default HMR2 preprocessing path additionally expects:
+The released training and inference pipeline uses SAM3D image features. It
+expects the following files from the ViT-H checkpoint repository:
 
 ```text
-inputs/checkpoints/body_models/smplx/SMPLX_NEUTRAL.npz
+vith_offline_g1.ckpt
+inputs/checkpoints/dpvo/dpvo.pth
+inputs/checkpoints/hmr2/epoch=10-step=25000.ckpt
 inputs/checkpoints/yolo/yolov8x.pt
 inputs/checkpoints/vitpose/vitpose-h-multi-coco.pth
-inputs/checkpoints/hmr2/epoch=10-step=25000.ckpt
 ```
 
-`SMPLX_NEUTRAL.npz` is separately licensed and must be obtained under the
-SMPL-X license. DPVO is optional; when `--use-dpvo` is used, also provide:
+The DPVO checkpoint is only used when `--use-dpvo` is passed. The default
+SimpleVO path does not require DPVO.
+
+The released configuration uses SAM3D. The bundled HMR2 checkpoint supports
+the optional `--imgfeat-encoder hmr2` compatibility path.
+
+Clone [Fast-SAM-3D-Body](https://github.com/yangtiming/Fast-SAM-3D-Body) into
+`third-party/Fast-SAM-3D-Body` and follow its setup instructions. Download the
+official SAM3D files into that checkout:
 
 ```text
-inputs/checkpoints/dpvo/dpvo.pth
+third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/model.ckpt
+third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/model_config.yaml
+third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/assets/mhr_model.pt
 ```
 
-SAM3D is optional and requires the three `--sam3d-*` arguments.
+`model.ckpt` contains the SAM3D network weights. `mhr_model.pt` contains the
+MHR parametric body model used by SAM3D. Both are required but neither is part
+of the ViT-H checkpoint repository.
+
+Create the body-model directory and obtain SMPL and SMPL-X from their official
+websites after registration: [SMPL](https://smpl.is.tue.mpg.de/) and
+[SMPL-X](https://smpl-x.is.tue.mpg.de/).
+
+```bash
+mkdir -p inputs/checkpoints/body_models/{smpl,smplx}
+```
+
+```text
+inputs/checkpoints/body_models/smpl/SMPL_{GENDER}.pkl
+inputs/checkpoints/body_models/smplx/SMPLX_{GENDER}.npz
+```
+
+Install [DPVO](https://github.com/princeton-vl/DPVO) only if DPVO camera
+estimation is needed:
+
+```bash
+mkdir -p third-party
+git clone --recursive https://github.com/princeton-vl/DPVO.git third-party/DPVO
+wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip \
+  -O /tmp/eigen-3.4.0.zip
+unzip /tmp/eigen-3.4.0.zip -d third-party/DPVO/thirdparty
+pip install ./third-party/DPVO
+```
+
+The resulting optional DPVO paths are:
+
+```text
+third-party/DPVO/config/default.yaml
+inputs/checkpoints/dpvo/dpvo.pth
+```
 
 ## Command
 
 ```bash
 python tools/infer_video.py \
   --video /path/to/input.mp4 \
-  --ckpt /path/to/model.ckpt \
+  --ckpt /path/to/vith_offline_g1.ckpt \
+  --imgfeat-encoder sam3d \
+  --sam3d-ckpt-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/model.ckpt \
+  --sam3d-mhr-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/assets/mhr_model.pt \
+  --sam3d-root third-party/Fast-SAM-3D-Body \
   --output outputs/inference/input_g1.npz
 ```
 

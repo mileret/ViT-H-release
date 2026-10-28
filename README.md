@@ -30,6 +30,76 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+SAM3D preprocessing and inference require
+[Fast-SAM-3D-Body](https://github.com/yangtiming/Fast-SAM-3D-Body). Clone it
+into `third-party/Fast-SAM-3D-Body` and follow its environment setup guide:
+
+```bash
+mkdir -p third-party
+git clone https://github.com/yangtiming/Fast-SAM-3D-Body.git \
+  third-party/Fast-SAM-3D-Body
+bash third-party/Fast-SAM-3D-Body/setup_env.sh
+conda activate fast_sam_3d_body
+```
+
+The SAM3D weights are distributed by the SAM3D project rather than in the
+ViT-H checkpoint repository.
+
+DPVO camera estimation is optional. To enable `--use-dpvo`, install
+[DPVO](https://github.com/princeton-vl/DPVO) under `third-party/DPVO`:
+
+```bash
+git clone --recursive https://github.com/princeton-vl/DPVO.git \
+  third-party/DPVO
+wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip \
+  -O /tmp/eigen-3.4.0.zip
+unzip /tmp/eigen-3.4.0.zip -d third-party/DPVO/thirdparty
+pip install ./third-party/DPVO
+```
+
+## Pretrained Models
+
+Create the checkpoint root:
+
+```bash
+mkdir -p inputs/checkpoints
+```
+
+Download SMPL and SMPL-X from their official websites after registration:
+[SMPL](https://smpl.is.tue.mpg.de/) and
+[SMPL-X](https://smpl-x.is.tue.mpg.de/). Place the files as follows:
+
+```text
+inputs/checkpoints/
+└── body_models/
+    ├── smpl/
+    │   └── SMPL_{GENDER}.pkl
+    └── smplx/
+        └── SMPLX_{GENDER}.npz
+```
+
+The ViT-H checkpoint repository contains the released offline model, YOLO,
+ViTPose, HMR2, and the optional DPVO weights. Download it into the project root
+so that the files follow this layout:
+
+```text
+vith_offline_g1.ckpt
+inputs/checkpoints/
+├── dpvo/
+│   └── dpvo.pth
+├── hmr2/
+│   └── epoch=10-step=25000.ckpt
+├── vitpose/
+│   └── vitpose-h-multi-coco.pth
+└── yolo/
+    └── yolov8x.pt
+```
+
+The released configuration uses SAM3D image features. The HMR2 checkpoint is
+included as an optional compatible image encoder. The SAM3D network and MHR
+files are obtained through Fast-SAM-3D-Body and stay inside
+`third-party/Fast-SAM-3D-Body/checkpoints/`.
+
 ## Dataset
 
 The full training set uses AMASS, BEDLAM, BEDLAM2, Human3.6M, and BONES-SEED.
@@ -80,20 +150,25 @@ sbatch slurm/train.sbatch
 ## Offline Inference
 
 Model checkpoints are not stored in this repository. Pass the checkpoint path
-explicitly:
+explicitly. The released model was trained with SAM3D image features, so
+inference requires both the SAM3D network checkpoint and its MHR body model:
 
 ```bash
 python tools/infer_video.py \
   --video /path/to/input.mp4 \
-  --ckpt /path/to/model.ckpt \
+  --ckpt /path/to/vith_offline_g1.ckpt \
+  --imgfeat-encoder sam3d \
+  --sam3d-ckpt-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/model.ckpt \
+  --sam3d-mhr-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/assets/mhr_model.pt \
+  --sam3d-root third-party/Fast-SAM-3D-Body \
   --output outputs/inference/input_g1.npz
 ```
 
 Video preprocessing additionally requires the external detector, pose,
-body-model, and image-encoder assets listed in
+body-model, and camera-estimation assets listed in
 [docs/INFERENCE.md](docs/INFERENCE.md). Use `--static-cam` only for videos with
-a known static camera; otherwise the default preprocessing estimates camera
-motion.
+a known static camera. Otherwise SimpleVO estimates camera motion by default;
+add `--use-dpvo` to use the installed DPVO package and `dpvo.pth` instead.
 
 ## Release Contents
 

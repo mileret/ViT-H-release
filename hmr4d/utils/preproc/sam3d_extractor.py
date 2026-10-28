@@ -50,22 +50,39 @@ class SAM3DExtractor:
         checkpoint_path = checkpoint_path or os.environ.get("SAM3D_CKPT_PATH")
         mhr_path = mhr_path or os.environ.get("SAM3D_MHR_PATH")
         if checkpoint_path is None:
-            default_ckpt = Path(__file__).resolve().parents[3] / "third-party" / "sam-3d-body-dinov3" / "model.ckpt"
+            default_ckpt = (
+                Path(__file__).resolve().parents[3]
+                / "third-party"
+                / "Fast-SAM-3D-Body"
+                / "checkpoints"
+                / "sam-3d-body-dinov3"
+                / "model.ckpt"
+            )
             if default_ckpt.exists():
                 checkpoint_path = str(default_ckpt)
         if mhr_path is None:
-            default_mhr = Path(__file__).resolve().parents[3] / "third-party" / "sam-3d-body-dinov3" / "assets" / "mhr_model.pt"
+            default_mhr = (
+                Path(__file__).resolve().parents[3]
+                / "third-party"
+                / "Fast-SAM-3D-Body"
+                / "checkpoints"
+                / "sam-3d-body-dinov3"
+                / "assets"
+                / "mhr_model.pt"
+            )
             if default_mhr.exists():
                 mhr_path = str(default_mhr)
         if checkpoint_path is None:
             raise FileNotFoundError(
                 "SAM3D checkpoint not found. Pass --sam3d_ckpt_path or set SAM3D_CKPT_PATH. "
-                "Expected relative path: third-party/sam-3d-body-dinov3/model.ckpt"
+                "Expected relative path: third-party/Fast-SAM-3D-Body/checkpoints/"
+                "sam-3d-body-dinov3/model.ckpt"
             )
         if mhr_path is None:
             raise FileNotFoundError(
                 "SAM3D MHR model not found. Pass --sam3d_mhr_path or set SAM3D_MHR_PATH. "
-                "Expected relative path: third-party/sam-3d-body-dinov3/assets/mhr_model.pt"
+                "Expected relative path: third-party/Fast-SAM-3D-Body/checkpoints/"
+                "sam-3d-body-dinov3/assets/mhr_model.pt"
             )
 
         try:
@@ -108,10 +125,10 @@ class SAM3DExtractor:
         repo_root = Path(__file__).resolve().parents[3]
         candidates.extend(
             [
-                repo_root / "third-party" / "Fast-SAM-3D-Body-main",
+                repo_root / "third-party" / "Fast-SAM-3D-Body",
                 repo_root / "third-party" / "sam-3d-body",
                 repo_root / "third-party" / "sam-3d-body-main",
-                repo_root / "third_party" / "Fast-SAM-3D-Body-main",
+                repo_root / "third_party" / "Fast-SAM-3D-Body",
                 repo_root / "third_party" / "sam-3d-body",
                 repo_root / "third_party" / "sam-3d-body-main",
                 repo_root / "third_party" / "sam_3d_body",
