@@ -8,11 +8,13 @@ same protocol-v4 fields used by the evaluation pipeline.
 
 - `vith_tracker/`: resampling, grounding, MuJoCo rollout, and success logic.
 - `tools/track_g1.py`: single-file command-line entry point.
+- `assets/g1/`: the rollout and grounding XML files with their required meshes.
 - `requirements-tracker.txt`: tracker-only Python dependencies.
 - `tests/`: lightweight schema and math tests.
 
-Checkpoint files, robot meshes, and robot XML files are intentionally excluded.
-They are binary or third-party artifacts and must be distributed separately.
+The ONNX policy checkpoint is intentionally excluded and must be downloaded
+separately. The included Unitree robot assets retain their BSD 3-Clause license
+in `assets/g1/LICENSE`.
 
 ## Input
 
@@ -34,13 +36,13 @@ resamples the rollout back to the source timestamps.
 Install the tracker dependencies in the same environment as ViT-H, then run:
 
 ```bash
-python tools/track_g1.py \
+python g1_tracker/tools/track_g1.py \
   --input outputs/example/motion.npz \
   --output outputs/example/tracked_motion.npz \
   --input-fps 30 \
-  --policy-onnx assets/tracker/model_step_020000_g1.onnx \
-  --xml-path assets/tracker/scene_29dof_mujoco.xml \
-  --grounding-xml assets/tracker/g1_29dof_rev_1_0.xml
+  --policy-onnx path/to/model_step_020000_g1.onnx \
+  --xml-path g1_tracker/assets/g1/rollout/scene_29dof_mujoco.xml \
+  --grounding-xml g1_tracker/assets/g1/grounding/mjcf/g1_29dof_rev_1_0.xml
 ```
 
 `--xml-path` is the rollout model. `--grounding-xml` is the 29-DoF FK model
@@ -52,13 +54,13 @@ different robot definition changes the rollout and is not equivalent.
 Add `--render-video` to render the tracked result after the rollout:
 
 ```bash
-MUJOCO_GL=egl python tools/track_g1.py \
+MUJOCO_GL=egl python g1_tracker/tools/track_g1.py \
   --input outputs/example/motion.npz \
   --output outputs/example/tracked_motion.npz \
   --input-fps 30 \
-  --policy-onnx assets/tracker/model_step_020000_g1.onnx \
-  --xml-path assets/tracker/scene_29dof_mujoco.xml \
-  --grounding-xml assets/tracker/g1_29dof_rev_1_0.xml \
+  --policy-onnx path/to/model_step_020000_g1.onnx \
+  --xml-path g1_tracker/assets/g1/rollout/scene_29dof_mujoco.xml \
+  --grounding-xml g1_tracker/assets/g1/grounding/mjcf/g1_29dof_rev_1_0.xml \
   --render-video
 ```
 
@@ -89,6 +91,5 @@ world-Z error of an ankle or wrist exceeds 0.25 m.
 
 Add this directory to the repository as a new `g1_tracker/` directory; no
 existing repository file needs to be replaced. From the repository root, the
-entry point is then `python g1_tracker/tools/track_g1.py`. Do not commit the
-policy checkpoint or robot assets unless their redistribution terms and file
-sizes have been reviewed. Run `bash scripts/check_release.sh` before committing.
+entry point is then `python g1_tracker/tools/track_g1.py`. Keep the policy
+checkpoint outside Git and run `bash scripts/check_release.sh` before committing.
