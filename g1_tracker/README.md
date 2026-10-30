@@ -86,10 +86,3 @@ The output NPZ contains:
 The success criterion is evaluated at 50 Hz. It fails when pelvis height error
 exceeds 0.25 m, squared pelvis orientation error exceeds 1.0 radian squared, or
 world-Z error of an ankle or wrist exceeds 0.25 m.
-
-## Repository integration
-
-Add this directory to the repository as a new `g1_tracker/` directory; no
-existing repository file needs to be replaced. From the repository root, the
-entry point is then `python g1_tracker/tools/track_g1.py`. Keep the policy
-checkpoint outside Git and run `bash scripts/check_release.sh` before committing.

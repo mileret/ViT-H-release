@@ -219,6 +219,8 @@ body-model, and camera-estimation assets listed in
 a known static camera. Otherwise SimpleVO estimates camera motion by default;
 add `--use-dpvo` to use the installed DPVO package and `dpvo.pth` instead.
 
+Generated G1 motions can optionally be tracked and evaluated in MuJoCo with the [G1 motion tracker](g1_tracker/README.md), whose entry point is `python g1_tracker/tools/track_g1.py`.
+
 ## Release Contents
 
 - `hmr4d/`: datasets, model, preprocessing, and shared utilities.
@@ -239,3 +241,7 @@ If you find ViT-H helpful, please consider citing:
   year={2026}
 }
 ```
+
+## Acknowledgements
+
+We thank the authors of [GVHMR](https://github.com/zju3dv/GVHMR), [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body), [Fast-SAM-3D-Body](https://github.com/yangtiming/Fast-SAM-3D-Body), [YOLOv8](https://github.com/ultralytics/ultralytics), [ViTPose](https://github.com/ViTAE-Transformer/ViTPose), [DPVO](https://github.com/princeton-vl/DPVO), and [HMR 2.0 / 4D-Humans](https://github.com/shubham-goel/4D-Humans) for their excellent prior work and publicly available code and models that supported this project.
