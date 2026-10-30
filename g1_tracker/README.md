@@ -12,9 +12,18 @@ same protocol-v4 fields used by the evaluation pipeline.
 - `requirements-tracker.txt`: tracker-only Python dependencies.
 - `tests/`: lightweight schema and math tests.
 
-The ONNX policy checkpoint is intentionally excluded and must be downloaded
-separately. The included Unitree robot assets retain their BSD 3-Clause license
-in `assets/g1/LICENSE`.
+Download the policy checkpoint from
+the [ViT-H checkpoint repository](https://huggingface.co/datasets/eerrr1/ViT-H-checkpoints):
+
+```bash
+hf download eerrr1/ViT-H-checkpoints \
+  model_step_020000_g1.onnx \
+  --repo-type dataset \
+  --local-dir inputs/checkpoints/g1_tracker
+```
+
+The included Unitree robot assets retain their BSD 3-Clause license in
+`assets/g1/LICENSE`.
 
 ## Input
 
@@ -40,7 +49,7 @@ python g1_tracker/tools/track_g1.py \
   --input outputs/example/motion.npz \
   --output outputs/example/tracked_motion.npz \
   --input-fps 30 \
-  --policy-onnx path/to/model_step_020000_g1.onnx \
+  --policy-onnx inputs/checkpoints/g1_tracker/model_step_020000_g1.onnx \
   --xml-path g1_tracker/assets/g1/rollout/scene_29dof_mujoco.xml \
   --grounding-xml g1_tracker/assets/g1/grounding/mjcf/g1_29dof_rev_1_0.xml
 ```
@@ -58,7 +67,7 @@ MUJOCO_GL=egl python g1_tracker/tools/track_g1.py \
   --input outputs/example/motion.npz \
   --output outputs/example/tracked_motion.npz \
   --input-fps 30 \
-  --policy-onnx path/to/model_step_020000_g1.onnx \
+  --policy-onnx inputs/checkpoints/g1_tracker/model_step_020000_g1.onnx \
   --xml-path g1_tracker/assets/g1/rollout/scene_29dof_mujoco.xml \
   --grounding-xml g1_tracker/assets/g1/grounding/mjcf/g1_29dof_rev_1_0.xml \
   --render-video

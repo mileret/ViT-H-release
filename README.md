@@ -79,8 +79,9 @@ inputs/checkpoints/
 ```
 
 The [ViT-H checkpoint repository](https://huggingface.co/datasets/eerrr1/ViT-H-checkpoints)
-contains the released offline model, YOLO, ViTPose, HMR2, and the optional DPVO
-weights. Download the required files into the project root:
+contains the released offline model, YOLO, ViTPose, HMR2, the optional DPVO
+weights, and the G1 tracker policy. Download the inference files into
+the project root:
 
 ```bash
 hf download eerrr1/ViT-H-checkpoints \
@@ -91,6 +92,16 @@ hf download eerrr1/ViT-H-checkpoints \
   inputs/checkpoints/yolo/yolov8x.pt \
   --repo-type dataset \
   --local-dir .
+```
+
+For G1 policy tracking, download the ONNX policy separately so that it stays in
+the ignored checkpoint directory:
+
+```bash
+hf download eerrr1/ViT-H-checkpoints \
+  model_step_020000_g1.onnx \
+  --repo-type dataset \
+  --local-dir inputs/checkpoints/g1_tracker
 ```
 
 The downloaded files follow this layout:
