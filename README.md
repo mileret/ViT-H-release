@@ -14,10 +14,13 @@
 
 This is the official implementation of <i>ViT-H: Generative Video-To-Humanoid Control with Motion Tracking Feedback.</i>
 
-## Plans
+## Release Plan
 
-- [x] Release code for offline video-to-humanoid control.
-- [ ] Release code for humanoid video teleoperation by December 1.
+- [x] Release inference code for offline video-to-humanoid control by November 1, 2026.
+- [x] Release pre-training code for offline video-to-humanoid control by November 1, 2026.
+- [ ] Release deployment code for humanoid video teleoperation by December 1, 2026.
+- [ ] Release pre-training code for humanoid video teleoperation by December 1, 2026.
+- [ ] Release post-training code by December 1, 2026.
 
 ## Installation
 
@@ -125,6 +128,13 @@ files are obtained through Fast-SAM-3D-Body and stay inside
 `third-party/Fast-SAM-3D-Body/checkpoints/`.
 
 ## Dataset
+
+We provide preprocessed data for training and evaluation. Due to licensing
+restrictions, we do not redistribute the original datasets. Please obtain the
+original data, including annotations and videos, directly from the respective
+dataset websites. By downloading our preprocessed data, you agree to comply with
+the terms of use of the corresponding datasets and to use the data for research
+purposes only.
 
 The released full experiment uses AMASS, BEDLAM, BEDLAM2, Human3.6M, and
 BONES-SEED. Preprocessed data for the first four sources is distributed as four
