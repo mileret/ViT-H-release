@@ -33,8 +33,13 @@ inputs/checkpoints/vitpose/vitpose-h-multi-coco.pth
 The DPVO checkpoint is only used when `--use-dpvo` is passed. The default
 SimpleVO path does not require DPVO.
 
-The released configuration uses SAM3D. The bundled HMR2 checkpoint supports
-the optional `--imgfeat-encoder hmr2` compatibility path.
+The released `vith_offline_g1.ckpt` uses SAM3D. Its encoder is selected
+automatically from the documented release compatibility rule, and inference
+does not silently fall back to HMR2. The HMR2 asset is retained only for
+custom or experimental checkpoints that explicitly use HMR2 features. A
+known SAM3D checkpoint rejects `--imgfeat-encoder hmr2` unless the explicitly
+experimental `--allow-encoder-mismatch` option is also supplied; results from
+that override are not guaranteed.
 
 Clone [Fast-SAM-3D-Body](https://github.com/yangtiming/Fast-SAM-3D-Body) into
 `third-party/Fast-SAM-3D-Body` and follow its setup instructions. Download the
@@ -88,7 +93,6 @@ inputs/checkpoints/dpvo/dpvo.pth
 python tools/infer_video.py \
   --video /path/to/input.mp4 \
   --ckpt /path/to/vith_offline_g1.ckpt \
-  --imgfeat-encoder sam3d \
   --sam3d-ckpt-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/model.ckpt \
   --sam3d-mhr-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/assets/mhr_model.pt \
   --sam3d-root third-party/Fast-SAM-3D-Body \
@@ -105,6 +109,33 @@ Architecture defaults are fixed to the released experiment:
 
 Use `--static-cam` only when the input camera is known to be static. Otherwise
 SimpleVO estimates camera motion. `--use-dpvo` selects DPVO explicitly.
+
+Custom checkpoints should record `imgfeat_encoder` in their checkpoint
+metadata. If a custom checkpoint has no such metadata and does not use the
+documented release filename, pass `--imgfeat-encoder sam3d` or
+`--imgfeat-encoder hmr2` explicitly.
+
+## Timeline and cache behavior
+
+Video frames are decoded with PyAV timestamps and resampled to a true 30 FPS
+timeline before tracking, pose estimation, feature extraction, and camera
+estimation. This supports constant- and variable-frame-rate inputs without
+changing the action duration. Empty videos, invalid/non-monotonic timestamps,
+and inconsistent derived frame counts fail with an error. The exported NPZ
+therefore records the same 30 FPS timeline actually seen by the model.
+
+Each preprocessing directory contains `preprocess/cache_manifest.json`. The
+cache identity includes a content hash of the source video, the resampling
+version and target FPS, preprocessing settings, encoder choice, checkpoint and
+MHR identities, detector/pose weights, camera method, and optional camera
+calibration. A missing, incomplete, mismatched, or corrupted manifest causes
+the managed cache to be rebuilt.
+
+- `--force-recompute` rebuilds the staged video and all managed preprocessing
+  artifacts.
+- `--force-recompute-imgfeat` rebuilds only image features and their metadata.
+- Neither option removes a user-provided `preprocess/camera_K.pt`; it is
+  validated against the resampled frame count and image dimensions.
 
 ## Output
 

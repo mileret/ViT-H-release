@@ -235,12 +235,19 @@ inference requires both the SAM3D network checkpoint and its MHR body model:
 python tools/infer_video.py \
   --video /path/to/input.mp4 \
   --ckpt /path/to/vith_offline_g1.ckpt \
-  --imgfeat-encoder sam3d \
   --sam3d-ckpt-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/model.ckpt \
   --sam3d-mhr-path third-party/Fast-SAM-3D-Body/checkpoints/sam-3d-body-dinov3/assets/mhr_model.pt \
   --sam3d-root third-party/Fast-SAM-3D-Body \
   --output outputs/inference/input_g1.npz
 ```
+
+For the documented `vith_offline_g1.ckpt`, the command selects SAM3D
+automatically and refuses a conflicting encoder by default. Input videos are
+timestamp-resampled to 30 FPS while preserving their duration. Preprocessing
+caches are content-addressed by the source video, settings, and model assets;
+use `--force-recompute` to rebuild all managed artifacts or
+`--force-recompute-imgfeat` to rebuild only image features. A user-provided
+`preprocess/camera_K.pt` is validated and is never deleted by either option.
 
 Video preprocessing additionally requires the external detector, pose,
 body-model, and camera-estimation assets listed in

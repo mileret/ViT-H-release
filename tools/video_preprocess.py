@@ -26,34 +26,177 @@ from hmr4d.utils.preproc import (
 from hmr4d.utils.pylogger import Log
 from hmr4d.utils.video_io_utils import (
     get_video_lwh,
-    get_video_reader,
-    get_writer,
     read_video_np,
+    resample_video_to_fps,
     save_video,
 )
+from hmr4d.utils.video_timeline import VIDEO_RESAMPLE_VERSION
 from hmr4d.utils.vis.cv2_utils import (
     draw_bbx_xyxy_on_image_batch,
     draw_coco17_skeleton_batch,
 )
+from tools.preprocess_cache import (
+    CACHE_SCHEMA_VERSION,
+    artifact_identities,
+    atomic_write_json,
+    directory_identity,
+    file_identity,
+    stable_fingerprint,
+    validate_complete_manifest,
+)
 
 CRF = 23
+TARGET_FPS = 30.0
+
+
+def _first_existing(*paths):
+    for path in paths:
+        if path is not None and Path(path).is_file():
+            return Path(path)
+    return Path(paths[0]) if paths and paths[0] is not None else None
+
+
+def _resolve_sam3d_resources(args):
+    repo_root = Path(__file__).resolve().parents[1]
+    default_root = repo_root / "third-party" / "Fast-SAM-3D-Body"
+    root = Path(args.sam3d_root).expanduser() if args.sam3d_root else default_root
+    ckpt = (
+        Path(args.sam3d_ckpt_path).expanduser()
+        if args.sam3d_ckpt_path
+        else root / "checkpoints/sam-3d-body-dinov3/model.ckpt"
+    )
+    mhr = (
+        Path(args.sam3d_mhr_path).expanduser()
+        if args.sam3d_mhr_path
+        else root / "checkpoints/sam-3d-body-dinov3/assets/mhr_model.pt"
+    )
+    missing = [str(path) for path in (root, ckpt, mhr) if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "SAM3D is required by the selected/released model, but these resources "
+            f"are missing: {missing}. Install Fast-SAM-3D-Body and pass the "
+            "--sam3d-* paths; inference will not fall back to HMR2."
+        )
+    if not root.is_dir() or not ckpt.is_file() or not mhr.is_file():
+        raise FileNotFoundError(
+            f"Invalid SAM3D resource types: root={root}, checkpoint={ckpt}, mhr={mhr}"
+        )
+    return root.resolve(), ckpt.resolve(), mhr.resolve()
+
+
+def _managed_cache_paths(cfg):
+    paths = cfg.paths
+    imgfeat_path = Path(paths.vit_features)
+    return [
+        Path(cfg.video_path),
+        Path(paths.bbx),
+        Path(paths.bbx_xyxy_video_overlay),
+        imgfeat_path,
+        imgfeat_path.with_name(f"{imgfeat_path.stem}.meta.json"),
+        Path(paths.vitpose),
+        Path(paths.vitpose_video_overlay),
+        Path(paths.slam),
+        Path(cfg.cache_manifest_path),
+    ]
+
+
+def _invalidate_managed_cache(cfg, reason):
+    removed = []
+    for path in _managed_cache_paths(cfg):
+        if path.is_file():
+            path.unlink()
+            removed.append(str(path))
+    if removed:
+        Log.warning(f"[Cache] invalidated ({reason}); removed {len(removed)} managed files")
+    else:
+        Log.info(f"[Cache] no reusable cache ({reason})")
+
+
+def _resource_identities(args, preprocess_dir):
+    repo_root = Path(__file__).resolve().parents[1]
+    yolo = repo_root / "inputs/checkpoints/yolo/yolov8x.pt"
+    vitpose = _first_existing(
+        repo_root / "inputs/checkpoints/vitpose/vitpose-h-multi-coco.pth",
+        repo_root / "inputs/checkpoints/vitpose/vitpose-h-multi-coco-001.pth",
+    )
+    resources = {
+        "yolo": file_identity(yolo, required=True),
+        "vitpose": file_identity(vitpose, required=True),
+    }
+    if args.imgfeat_encoder == "sam3d":
+        root, ckpt, mhr = _resolve_sam3d_resources(args)
+        args.sam3d_root = str(root)
+        args.sam3d_ckpt_path = str(ckpt)
+        args.sam3d_mhr_path = str(mhr)
+        resources.update(
+            {
+                "sam3d_checkpoint": file_identity(ckpt, required=True),
+                "sam3d_mhr": file_identity(mhr, required=True),
+                "sam3d_repository": directory_identity(
+                    root,
+                    (
+                        "checkpoints/sam-3d-body-dinov3/model_config.yaml",
+                        "sam_3d_body/__init__.py",
+                    ),
+                    required=True,
+                ),
+            }
+        )
+    elif args.imgfeat_encoder == "hmr2":
+        hmr2 = _first_existing(
+            repo_root / "inputs/checkpoints/hmr2/epoch=10-step=25000.ckpt",
+            repo_root / "inputs/checkpoints/hmr2/epoch=10-step=25000-001.ckpt",
+        )
+        resources["hmr2"] = file_identity(hmr2, required=True)
+    else:
+        raise ValueError(f"Unknown imgfeat_encoder: {args.imgfeat_encoder}")
+
+    if args.use_dpvo:
+        resources["dpvo_checkpoint"] = file_identity(
+            repo_root / "inputs/checkpoints/dpvo/dpvo.pth", required=True
+        )
+        resources["dpvo_config"] = file_identity(
+            repo_root / "third-party/DPVO/config/default.yaml", required=True
+        )
+    resources["camera_K"] = file_identity(preprocess_dir / "camera_K.pt", required=False)
+    return resources
 
 
 def build_preprocess_cfg(args):
-    """Build the minimal preprocessing config and stage the input video."""
-    source_video = Path(args.video)
+    """Build preprocessing config, validate cache identity, and stage at 30 FPS."""
+    source_video = Path(args.video).expanduser().resolve()
     if not source_video.is_file():
         raise FileNotFoundError(f"Input video not found: {source_video}")
-
-    length, width, height = get_video_lwh(source_video)
-    Log.info(f"[Input] {source_video}")
-    Log.info(f"(L, W, H) = ({length}, {width}, {height})")
 
     output_dir = Path(args.output_root) / source_video.stem
     preprocess_dir = output_dir / "preprocess"
     staged_video = output_dir / "0_input_video.mp4"
+    manifest_path = preprocess_dir / "cache_manifest.json"
     output_dir.mkdir(parents=True, exist_ok=True)
     preprocess_dir.mkdir(parents=True, exist_ok=True)
+
+    resources = _resource_identities(args, preprocess_dir)
+    source_identity = file_identity(source_video, required=True)
+    cache_config = {
+        "target_fps": TARGET_FPS,
+        "resample_version": VIDEO_RESAMPLE_VERSION,
+        "imgfeat_encoder": str(args.imgfeat_encoder),
+        "model_imgfeat_encoder": getattr(args, "model_imgfeat_encoder", None),
+        "sam3d_img_ds": float(args.sam3d_img_ds),
+        "sam3d_batch_size": int(args.sam3d_batch_size),
+        "tracker": {"type": "yolov8", "base_enlarge": 1.2},
+        "pose": {"type": "vitpose_huge_coco_256x192", "img_ds": 0.5},
+        "camera": {
+            "method": "static" if args.static_cam else ("dpvo" if args.use_dpvo else "simplevo"),
+            "f_mm": args.f_mm,
+            "simplevo": {"scale": 0.5, "step": 8, "method": "sift"},
+            "dpvo": {"resize": 0.5},
+        },
+        "verbose_overlays": bool(args.verbose),
+        "resources": resources,
+    }
+    cache_identity = {"source": source_identity, "config": cache_config}
+    cache_fingerprint = stable_fingerprint(cache_identity)
 
     cfg = OmegaConf.create(
         {
@@ -62,17 +205,25 @@ def build_preprocess_cfg(args):
             "output_dir": str(output_dir),
             "preprocess_dir": str(preprocess_dir),
             "video_path": str(staged_video),
+            "source_video": str(source_video),
+            "target_fps": TARGET_FPS,
             "static_cam": bool(args.static_cam),
             "verbose": bool(args.verbose),
             "use_dpvo": bool(args.use_dpvo),
             "f_mm": args.f_mm,
             "imgfeat_encoder": args.imgfeat_encoder,
+            "model_imgfeat_encoder": getattr(args, "model_imgfeat_encoder", None),
+            "force_recompute": bool(getattr(args, "force_recompute", False)),
             "force_recompute_imgfeat": bool(args.force_recompute_imgfeat),
             "sam3d_ckpt_path": args.sam3d_ckpt_path,
             "sam3d_mhr_path": args.sam3d_mhr_path,
             "sam3d_root": args.sam3d_root,
             "sam3d_img_ds": float(args.sam3d_img_ds),
             "sam3d_batch_size": int(args.sam3d_batch_size),
+            "cache_manifest_path": str(manifest_path),
+            "cache_fingerprint": cache_fingerprint,
+            "cache_identity": cache_identity,
+            "cache_config": cache_config,
             "paths": {
                 "bbx": str(preprocess_dir / "bbx.pt"),
                 "bbx_xyxy_video_overlay": str(
@@ -88,18 +239,43 @@ def build_preprocess_cfg(args):
         }
     )
 
+    cache_ok, cache_reason, cached_manifest = validate_complete_manifest(
+        manifest_path, cache_fingerprint
+    )
+    if cfg.force_recompute:
+        cache_ok = False
+        cache_reason = "--force-recompute requested"
+    if not cache_ok:
+        _invalidate_managed_cache(cfg, cache_reason)
+
     Log.info(f"[Output Dir] {output_dir}")
-    if (
-        not staged_video.exists()
-        or get_video_lwh(source_video)[0] != get_video_lwh(staged_video)[0]
-    ):
-        Log.info(f"[Copy Video] {source_video} -> {staged_video}")
-        reader = get_video_reader(source_video)
-        writer = get_writer(staged_video, fps=30, crf=CRF)
-        for image in tqdm(reader, total=length, desc="Copy"):
-            writer.write_frame(image)
-        writer.close()
-        reader.close()
+    if cache_ok:
+        timeline = cached_manifest.get("timeline")
+        Log.info(f"[Cache] verified complete preprocessing cache: {manifest_path}")
+    else:
+        Log.info(f"[Resample] {source_video} -> {staged_video} at {TARGET_FPS:g} FPS")
+        timeline = resample_video_to_fps(
+            source_video,
+            staged_video,
+            target_fps=TARGET_FPS,
+            crf=CRF,
+        )
+    length, width, height = get_video_lwh(staged_video)
+    if int(timeline["target_frames"]) != length:
+        raise RuntimeError(
+            f"Staged timeline mismatch: manifest/resampler={timeline['target_frames']}, "
+            f"decoded={length}"
+        )
+    cfg.timeline = timeline
+    cfg.cache_verified = bool(cache_ok)
+    Log.info(f"[Input] {source_video}")
+    Log.info(
+        f"[Timeline] source_frames={timeline['source_decoded_frames']}, "
+        f"source_duration={timeline['source_duration_seconds']:.6f}s, "
+        f"target_frames={length}, target_fps={TARGET_FPS:g}, "
+        f"strategy={timeline['strategy']}"
+    )
+    Log.info(f"[Staged] (L, W, H) = ({length}, {width}, {height})")
 
     return cfg
 
@@ -151,9 +327,18 @@ def run_preprocess(cfg):
         "encoder": encoder,
         "feature_dim": 1024,
         "img_ds": 0.5 if encoder == "hmr2" else float(cfg.sam3d_img_ds),
+        "cache_fingerprint": str(cfg.cache_fingerprint),
+        "encoder_resources": OmegaConf.to_container(
+            cfg.cache_config.resources,
+            resolve=True,
+        ),
     }
 
-    recompute = bool(cfg.force_recompute_imgfeat) or not imgfeat_path.exists()
+    if bool(cfg.force_recompute_imgfeat):
+        imgfeat_path.unlink(missing_ok=True)
+        meta_path.unlink(missing_ok=True)
+        Log.info("[Cache] --force-recompute-imgfeat removed only image-feature cache files")
+    recompute = not imgfeat_path.exists()
     if imgfeat_path.exists() and not recompute:
         if not meta_path.exists():
             raise RuntimeError(
@@ -247,6 +432,47 @@ def run_preprocess(cfg):
     elif not cfg.static_cam:
         Log.info(f"[Preprocess] slam from {paths.slam}")
 
+    length, _, _ = get_video_lwh(video_path)
+    bbx_cache = torch.load(paths.bbx, map_location="cpu")
+    checks = {
+        "bbx": int(bbx_cache["bbx_xys"].shape[0]),
+        "vitpose": int(torch.load(paths.vitpose, map_location="cpu").shape[0]),
+        "features": int(torch.load(paths.vit_features, map_location="cpu").shape[0]),
+    }
+    if not cfg.static_cam:
+        checks["camera"] = int(np.asarray(torch.load(paths.slam, map_location="cpu")).shape[0])
+    mismatched_lengths = {name: value for name, value in checks.items() if value != length}
+    if mismatched_lengths:
+        raise RuntimeError(
+            f"Preprocessing cache length mismatch for staged video length {length}: "
+            f"{mismatched_lengths}"
+        )
+
+    completed_paths = [
+        cfg.video_path,
+        paths.bbx,
+        paths.vitpose,
+        paths.vit_features,
+        meta_path,
+    ]
+    if not cfg.static_cam:
+        completed_paths.append(paths.slam)
+    if cfg.verbose:
+        completed_paths.extend(
+            [paths.bbx_xyxy_video_overlay, paths.vitpose_video_overlay]
+        )
+    manifest = {
+        "schema_version": CACHE_SCHEMA_VERSION,
+        "status": "complete",
+        "cache_fingerprint": str(cfg.cache_fingerprint),
+        "identity": OmegaConf.to_container(cfg.cache_identity, resolve=True),
+        "timeline": OmegaConf.to_container(cfg.timeline, resolve=True),
+        "frame_counts": checks,
+        "artifacts": artifact_identities(completed_paths),
+    }
+    atomic_write_json(cfg.cache_manifest_path, manifest)
+    Log.info(f"[Cache] wrote complete manifest: {cfg.cache_manifest_path}")
+
     Log.info(f"[Preprocess] End. Time elapsed: {Log.time() - tic:.2f}s")
 
 
@@ -324,7 +550,7 @@ def load_data_dict(cfg):
                 )
             R_w2c = torch.from_numpy(trajectory[:, :3, :3])
 
-    return {
+    data = {
         "length": torch.tensor(length),
         "bbx_xys": torch.load(
             cfg.paths.bbx, map_location="cpu"
@@ -336,3 +562,21 @@ def load_data_dict(cfg):
             cfg.paths.vit_features, map_location="cpu"
         ),
     }
+    expected_shapes = {
+        "bbx_xys": (length, 3),
+        "kp2d": (length, 17, 3),
+        "K_fullimg": (length, 3, 3),
+        "cam_angvel": (length, 6),
+        "f_imgseq": (length, 1024),
+    }
+    invalid = {
+        key: (tuple(data[key].shape), shape)
+        for key, shape in expected_shapes.items()
+        if tuple(data[key].shape) != shape
+    }
+    if invalid:
+        raise RuntimeError(f"Invalid preprocessing tensor shapes: {invalid}")
+    for key in expected_shapes:
+        if not torch.isfinite(torch.as_tensor(data[key])).all():
+            raise RuntimeError(f"Preprocessing tensor contains non-finite values: {key}")
+    return data
