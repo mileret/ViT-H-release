@@ -21,12 +21,14 @@ training_set/
 |   |-- part_00/
 |   `-- part_01/
 |-- bones_seed/
-|   |-- samples/
-|   |   `-- <session>.pkl
-|   |-- manifests/
-|   |   `-- <session>.json
-|   |-- index.json
-|   `-- conversion_report.json
+|   |-- soma/                 # 30 FPS SOMA intermediates
+|   |-- soma_filtered/        # selected SOMA intermediates
+|   |-- robot/                # 30 FPS G1 intermediates
+|   |-- robot_filtered/       # selected G1 intermediates
+|   `-- paired/
+|       |-- <session>.pkl
+|       |-- bones_seed_index_v1.json
+|       `-- export_errors.log
 `-- metadata/
     |-- normalization_stats.npz
     `-- camera_stats.npz
@@ -53,20 +55,27 @@ bones-seed/
 `-- g1/csv/<session>/<motion>.csv
 ```
 
-Convert it to the layout consumed by `BonesSeedG1SomaDataset`:
+Create a dedicated preprocessing environment and convert the data to the layout
+consumed by `BonesSeedG1SomaDataset`:
 
 ```bash
-python tools/prepare_bones_seed.py \
-  --source /path/to/bones-seed \
-  --output /path/to/training_set/bones_seed \
-  --workers 4
+conda create -n bones-seed-preprocess python=3.10 -y
+conda activate bones-seed-preprocess
+pip install -r tools/bones_seed_preprocessing/requirements.txt
+
+bash tools/bones_seed_preprocessing/run_preprocessing.sh \
+  /path/to/bones-seed \
+  /path/to/training_set/bones_seed \
+  16
 ```
 
 Every converted sequence contains paired `g1` and `soma` entries. G1 arrays
 include root pose, 29 BYD-ordered joint angles, and 30-body forward-kinematics
 results. SOMA arrays contain root orientation and the 28 joints expected by the
-training loader. Both sides are aligned and sampled at 30 FPS. The converter
-also writes `index.json`; no separate indexing step is required.
+training loader. Both sides are aligned and sampled at 30 FPS. The final
+exporter writes `paired/bones_seed_index_v1.json`; no separate indexing step is
+required. Only `paired/` is needed for training after a successful conversion.
+The preceding directories are reproducible intermediate products.
 
 To copy the extracted dataset to node-local storage without modifying the
 source:

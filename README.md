@@ -177,22 +177,30 @@ tar -xzf g1.tar.gz
 tar -xzf soma_proportional.tar.gz
 ```
 
-Convert the official 120 FPS files to the paired 30 FPS representation used by
-the training loader. The converter matches each proportional SOMA BVH with its
-G1 CSV, converts coordinate and rotation conventions, runs G1 forward
-kinematics, writes session shards, and creates `index.json`.
+Convert the official 120 FPS files with the released BONES-SEED preprocessing
+pipeline. It extracts the 28 proportional SOMA joints, converts the provided G1
+CSV trajectories through SONIC MotionLib/FK, applies the same motion-selection
+rules to both modalities, pairs them at 30 FPS, and writes session shards plus
+the training index. The G1 CSV files are already retargeted by BONES-SEED; this
+pipeline does not retarget the human BVH motions to G1.
 
 ```bash
 cd /path/to/ViT-H-release
-python tools/prepare_bones_seed.py \
-  --source /path/to/bones-seed \
-  --output /path/to/training_set/bones_seed \
-  --workers 4
+conda create -n bones-seed-preprocess python=3.10 -y
+conda activate bones-seed-preprocess
+pip install -r tools/bones_seed_preprocessing/requirements.txt
+
+bash tools/bones_seed_preprocessing/run_preprocessing.sh \
+  /path/to/bones-seed \
+  /path/to/training_set/bones_seed \
+  16
 ```
 
-The full conversion is CPU- and storage-intensive. Start with `--limit 1` and
-a separate output directory if you want to validate the environment before
-converting the complete dataset.
+The training files are written to
+`/path/to/training_set/bones_seed/paired/`. The full conversion is CPU- and
+storage-intensive and must use a fresh output directory. See
+[tools/bones_seed_preprocessing/README.md](tools/bones_seed_preprocessing/README.md)
+for the intermediate layout, output schema, filtering rules, and provenance.
 
 ## Training
 
@@ -247,6 +255,7 @@ Generated G1 motions can optionally be tracked and evaluated in MuJoCo with the 
 - `hmr4d/`: datasets, model, preprocessing, and shared utilities.
 - `motion_lib/`: G1 kinematics and rotation utilities.
 - `scripts/train.sh`: reproducible offline training entry point.
+- `tools/bones_seed_preprocessing/`: BONES-SEED-to-training-data preprocessing.
 - `tools/infer_video.py`: end-to-end video inference entry point.
 - `experiments/g1_training_set_exp1/`: resolved experiment configuration and checksums.
 - `docs/`: dataset and inference documentation.

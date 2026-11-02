@@ -5,5 +5,8 @@
 *.yml text eol=lf
 *.npz binary
 *.pt binary
+*.STL binary
+*.stl binary
+*.xml text eol=lf
 *.json text
 SHA256SUMS text eol=lf

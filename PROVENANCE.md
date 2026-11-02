@@ -35,6 +35,15 @@ when the release was assembled.
 The emitted Hydra configuration records the training setup; the source snapshot
 is the closest recoverable version, not a claimed bit-for-bit launch checkout.
 
+## BONES-SEED preprocessing
+
+`tools/bones_seed_preprocessing/` contains the preprocessing entry points,
+minimal SONIC MotionLib dependencies, G1 model assets, and source manifest used
+to produce the paired BONES-SEED representation consumed by training. Upstream
+licenses, citation metadata, and third-party notices are preserved inside its
+`GR00T-WholeBodyControl/` directory. Raw BONES-SEED motions and generated
+training shards are not included.
+
 ## Excluded artifacts
 
 - the remainder of the experiment output directory

@@ -1,0 +1,13 @@
+numpy<2
+scipy
+joblib
+torch
+easydict
+loguru
+rich
+hydra-core
+omegaconf
+lxml
+open3d
+wandb
+tqdm

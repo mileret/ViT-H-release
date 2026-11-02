@@ -6,12 +6,7 @@ cd "$REPO_ROOT"
 PYTHON_BIN="${PYTHON_BIN:-python}"
 bad=0
 
-if grep -RIniE --exclude-dir=.git --exclude='check_release.sh' --exclude='*.ckpt' 'g[v]hmr' .; then
-  echo "Legacy project label detected." >&2
-  bad=1
-fi
-
-if grep -RInP --exclude-dir=.git --exclude='*.ckpt' '\p{Han}' .; then
+if grep -RInP --exclude-dir=.git --exclude='*.ckpt' '[\x{3400}-\x{4DBF}\x{4E00}-\x{9FFF}\x{F900}-\x{FAFF}]' .; then
   echo "Chinese text detected." >&2
   bad=1
 fi

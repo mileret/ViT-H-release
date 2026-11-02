@@ -333,8 +333,8 @@ train_datasets:
     - 0.0
   bones_seed:
     _target_: hmr4d.dataset.pure_motion.g1_amass.BonesSeedG1SomaDataset
-    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/samples
-    index_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/index.json
+    data_dir: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/paired
+    index_path: ${oc.env:VITH_DATASET_ROOT,/path/to/training_set}/bones_seed/paired/bones_seed_index_v1.json
     motion_frames: 120
     cam_augmentation: v11
     canonicalize_first_frame: true
