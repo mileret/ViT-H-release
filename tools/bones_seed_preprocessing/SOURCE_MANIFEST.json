@@ -196,8 +196,8 @@
   },
   {
     "path": "GR00T-WholeBodyControl/gear_sonic/data_process/convert_soma_csv_to_motion_lib.py",
-    "sha256": "ab8361a08894c19b7160278d25cf3d47aad924f5be78c72fc0f1a38eba68e9dd",
-    "bytes": 21308
+    "sha256": "245c16270e2e0601176979dc4ae50ed7c2de56ca49b1cfbc07347a12196b42e1",
+    "bytes": 21281
   },
   {
     "path": "GR00T-WholeBodyControl/gear_sonic/data_process/extract_soma_joints_with_eyes_global_from_bvh.py",
@@ -286,23 +286,23 @@
   },
   {
     "path": "GR00T-WholeBodyControl/legal/Apache License - GEAR-SONIC.txt",
-    "sha256": "4d42f1db12bb3b31150f735fdb3e18f40c7984f50f17bcad783e9bb5251e74b7",
-    "bytes": 5946
+    "sha256": "49cef08069d8eb9dead2cb31804502ccdb4fc7ef9fc5a5eef3b2c68b66dac24e",
+    "bytes": 5854
   },
   {
     "path": "GR00T-WholeBodyControl/legal/DCO - GEAR-SONIC.txt",
-    "sha256": "ce79005e7860757336cd75dd2ea56c9a30b4b4d72cc0b336411aa15baee3ed57",
-    "bytes": 844
+    "sha256": "85bed80c19b03c3be6476dc4009af47cd189295e6d0fc292751aa7d4348465f1",
+    "bytes": 834
   },
   {
     "path": "GR00T-WholeBodyControl/legal/THIRD-PARTY SOFTWARE NOTICES - GEAR-SONIC.txt",
-    "sha256": "f88d3638f4eee9e3f3e52c13eccca950755cbaaae4e9923a2d45435b2574d3be",
-    "bytes": 856
+    "sha256": "4098a4da23719dcc68ca4d8c1322a62986747fc98174adcde3187ffb23f75314",
+    "bytes": 837
   },
   {
     "path": "GR00T-WholeBodyControl/legal/THIRD-PARTY SOFTWARE NOTICES AND ASSET LICENSES - GEAR-SONIC.txt",
-    "sha256": "23fb2ecf02259d8fc78850e4f1466d44e01fbe514c5f2ffbab0578bd0054f0e0",
-    "bytes": 2786
+    "sha256": "b8b7884aae476f46310287eaf19677d673c5dfa8c5e9af6f43ceb83fdf51a33b",
+    "bytes": 2736
   },
   {
     "path": "src/humanoid_recon/data_process/export_sonic_paired_motions.py",
