@@ -48,7 +48,9 @@ def probe_video_timeline(video_path):
 
     video_path = str(video_path)
     timestamps = []
-    last_duration = None
+    last_frame_end = None
+    packet_ends = {}
+    stream_end = None
     average_fps = None
     width = height = None
     with av.open(video_path) as container:
@@ -57,50 +59,69 @@ def probe_video_timeline(video_path):
             raise ValueError(f"No video stream found: {video_path}")
         stream = streams[0]
         width, height = int(stream.width), int(stream.height)
+        # Stream duration is in stream.time_base units, relative to start_time.
+        # Container duration may include longer audio streams and is not usable.
+        if stream.duration is not None and stream.start_time is not None and stream.time_base is not None:
+            stream_end = (stream.start_time + stream.duration) * stream.time_base
         if stream.average_rate is not None:
             try:
                 average_fps = float(stream.average_rate)
             except (TypeError, ValueError, ZeroDivisionError):
                 average_fps = None
-        for frame in container.decode(stream):
-            if frame.pts is None or frame.time_base is None:
-                raise ValueError(
-                    f"Video frame has no parseable timestamp (PTS/time_base): {video_path}"
+        # Demux also yields decoder-flush packets. Match by presentation time,
+        # not packet order: codecs with B frames reorder their packets.
+        for packet in container.demux(stream):
+            if packet.pts is not None and packet.time_base is not None and packet.duration and packet.duration > 0:
+                packet_time = packet.pts * packet.time_base
+                packet_ends[packet_time] = packet_time + packet.duration * packet.time_base
+            for frame in packet.decode():
+                if frame.pts is None or frame.time_base is None:
+                    raise ValueError(
+                        f"Video frame has no parseable timestamp (PTS/time_base): {video_path}"
+                    )
+                timestamp = frame.pts * frame.time_base
+                if not np.isfinite(float(timestamp)):
+                    raise ValueError(f"Non-finite frame timestamp in {video_path}")
+                timestamps.append(timestamp)
+                # PyAV 13 has no VideoFrame.duration. Never retain a previous
+                # frame's duration when the final frame has no duration field.
+                frame_duration = getattr(frame, "duration", None)
+                last_frame_end = (
+                    timestamp + frame_duration * frame.time_base
+                    if frame_duration is not None and frame_duration > 0 else None
                 )
-            timestamp = float(frame.pts * frame.time_base)
-            if not np.isfinite(timestamp):
-                raise ValueError(f"Non-finite frame timestamp in {video_path}")
-            timestamps.append(timestamp)
-            frame_duration = getattr(frame, "duration", None)
-            if frame_duration is not None and frame_duration > 0:
-                last_duration = float(frame_duration * frame.time_base)
 
     if not timestamps:
         raise ValueError(f"Video contains no decoded frames: {video_path}")
-    timestamps = np.asarray(timestamps, dtype=np.float64)
-    timestamps -= timestamps[0]
+    first_timestamp, last_timestamp = timestamps[0], timestamps[-1]
+    duration = None
+    for duration_source, end in (
+        ("frame", last_frame_end),
+        ("packet", packet_ends.get(last_timestamp)),
+        ("video_stream", stream_end),
+    ):
+        if end is not None and np.isfinite(float(end)) and end > last_timestamp:
+            duration = float(end - first_timestamp)
+            break
+    if duration is None:
+        raise ValueError(
+            f"Cannot reliably determine final-frame duration from frame, packet, "
+            f"or video-stream metadata: {video_path}"
+        )
+    timestamps = np.asarray([float(t - first_timestamp) for t in timestamps], dtype=np.float64)
     deltas = np.diff(timestamps)
     if deltas.size and (not np.isfinite(deltas).all() or np.any(deltas <= 0)):
         raise ValueError(f"Video timestamps are not strictly increasing: {video_path}")
-    if last_duration is None or not np.isfinite(last_duration) or last_duration <= 0:
-        if deltas.size:
-            last_duration = float(np.median(deltas))
-        elif average_fps is not None and average_fps > 0:
-            last_duration = 1.0 / average_fps
-        else:
-            raise ValueError(
-                f"Cannot infer duration for the only frame in video: {video_path}"
-            )
-    duration = float(timestamps[-1] + last_duration)
     if width <= 0 or height <= 0 or duration <= 0:
         raise ValueError(
             f"Invalid decoded video metadata for {video_path}: "
             f"size={width}x{height}, duration={duration}"
         )
+    intervals = np.append(deltas, duration - timestamps[-1])
     is_vfr = bool(
-        deltas.size > 1
-        and np.max(np.abs(deltas - np.median(deltas)))
-        > max(1e-6, abs(float(np.median(deltas))) * 1e-3)
+        intervals.size > 1
+        and np.max(np.abs(intervals - np.median(intervals)))
+        > max(1e-6, abs(float(np.median(intervals))) * 1e-3)
     )
     timestamp_hash = hashlib.sha256(
         json.dumps(timestamps.tolist(), separators=(",", ":")).encode("utf-8")
@@ -108,6 +129,8 @@ def probe_video_timeline(video_path):
     return {
         "timestamps": timestamps,
         "duration": duration,
+        "duration_source": duration_source,
+        "start_seconds": float(first_timestamp),
         "decoded_frames": int(timestamps.size),
         "width": width,
         "height": height,
@@ -187,6 +210,8 @@ def resample_video_to_fps(source_path, output_path, target_fps=30.0, crf=23):
         "source_decoded_frames": timeline["decoded_frames"],
         "source_average_fps": timeline["average_fps"],
         "source_duration_seconds": timeline["duration"],
+        "source_duration_source": timeline["duration_source"],
+        "source_start_seconds": timeline["start_seconds"],
         "source_is_vfr": timeline["is_vfr"],
         "source_timestamp_sha256": timeline["timestamp_sha256"],
         "target_fps": target_fps,

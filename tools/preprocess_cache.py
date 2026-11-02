@@ -1,15 +1,78 @@
-"""Content-addressed cache helpers for released video preprocessing."""
+"""Content validation and process ownership for video preprocessing caches."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import errno
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 
-CACHE_SCHEMA_VERSION = 2
+CACHE_SCHEMA_VERSION = 3
+
+_HELD_CACHE_LOCKS = set()
+
+
+def _lock_key(output_dir):
+    return (str(Path(output_dir).resolve()), os.getpid(), threading.get_ident())
+
+
+def require_cache_lock(output_dir):
+    """Reject cache access outside the lifetime protected by the caller."""
+    if _lock_key(output_dir) not in _HELD_CACHE_LOCKS:
+        raise RuntimeError(
+            f"Preprocessing cache access requires cache_directory_lock({str(output_dir)!r}); "
+            "hold it through configuration, generation, and all cache reads."
+        )
+
+
+@contextmanager
+def cache_directory_lock(output_dir):
+    """Exclusively own a cache through its last read; fail fast on contention.
+
+    OS locks are released even if a worker crashes. Keep the lock file in place:
+    unlinking it could let a new worker lock a different inode at the same path.
+    """
+    output_dir = Path(output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    key = _lock_key(output_dir)
+    if key in _HELD_CACHE_LOCKS:
+        raise RuntimeError(f"Preprocessing cache is already in use: {output_dir}")
+    with (output_dir / ".preprocess.lock").open("a+b") as handle:
+        # Windows byte-range locks require a byte to lock.
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                raise
+            raise RuntimeError(
+                f"Preprocessing cache is already in use: {output_dir}. "
+                "Retry after the other process finishes, or use a different --output-root."
+            ) from exc
+        _HELD_CACHE_LOCKS.add(key)
+        try:
+            yield output_dir
+        finally:
+            _HELD_CACHE_LOCKS.remove(key)
+            handle.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def sha256_file(path: str | Path, chunk_size: int = 8 * 1024 * 1024) -> str:

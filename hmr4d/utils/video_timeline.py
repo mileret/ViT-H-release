@@ -3,7 +3,7 @@
 import numpy as np
 
 
-VIDEO_RESAMPLE_VERSION = "pyav-timestamp-nearest-v1"
+VIDEO_RESAMPLE_VERSION = "pyav-timestamp-nearest-v2"
 
 
 def select_frame_indices_by_timestamp(timestamps, duration, target_fps):

@@ -1,27 +1,17 @@
 """Video preprocessing required by the released offline G1 inference path."""
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
 import torch
 from omegaconf import OmegaConf
-from pytorch3d.transforms import quaternion_to_matrix
 from tqdm import tqdm
 
-from hmr4d.utils.geo.hmr_cam import (
-    convert_K_to_K4,
-    create_camera_sensor,
-    estimate_K,
-    get_bbx_xys_from_xyxy,
-)
-from hmr4d.utils.geo_transform import compute_cam_angvel
-from hmr4d.utils.preproc import (
-    Extractor,
-    SAM3DExtractor,
-    SimpleVO,
-    Tracker,
-    VitPoseExtractor,
+from hmr4d.utils.sam3d_config import (
+    resolve_sam3d_model_config,
+    sam3d_runtime_settings,
 )
 from hmr4d.utils.pylogger import Log
 from hmr4d.utils.video_io_utils import (
@@ -31,16 +21,14 @@ from hmr4d.utils.video_io_utils import (
     save_video,
 )
 from hmr4d.utils.video_timeline import VIDEO_RESAMPLE_VERSION
-from hmr4d.utils.vis.cv2_utils import (
-    draw_bbx_xyxy_on_image_batch,
-    draw_coco17_skeleton_batch,
-)
 from tools.preprocess_cache import (
     CACHE_SCHEMA_VERSION,
     artifact_identities,
     atomic_write_json,
+    cache_directory_lock,
     directory_identity,
     file_identity,
+    require_cache_lock,
     stable_fingerprint,
     validate_complete_manifest,
 )
@@ -101,6 +89,7 @@ def _managed_cache_paths(cfg):
 
 
 def _invalidate_managed_cache(cfg, reason):
+    require_cache_lock(cfg.output_dir)
     removed = []
     for path in _managed_cache_paths(cfg):
         if path.is_file():
@@ -132,10 +121,11 @@ def _resource_identities(args, preprocess_dir):
             {
                 "sam3d_checkpoint": file_identity(ckpt, required=True),
                 "sam3d_mhr": file_identity(mhr, required=True),
+                "sam3d_model_config": file_identity(resolve_sam3d_model_config(ckpt), required=True),
                 "sam3d_repository": directory_identity(
                     root,
                     (
-                        "checkpoints/sam-3d-body-dinov3/model_config.yaml",
+                        "sam_3d_body/build_models.py",
                         "sam_3d_body/__init__.py",
                     ),
                     required=True,
@@ -162,13 +152,25 @@ def _resource_identities(args, preprocess_dir):
     return resources
 
 
+def preprocess_output_dir(args):
+    return Path(args.output_root).expanduser().resolve() / Path(args.video).expanduser().resolve().stem
+
+
+@contextmanager
+def preprocessing_session(args):
+    """Keep cache ownership from validation through the caller's final read."""
+    with cache_directory_lock(preprocess_output_dir(args)):
+        yield build_preprocess_cfg(args)
+
+
 def build_preprocess_cfg(args):
-    """Build preprocessing config, validate cache identity, and stage at 30 FPS."""
+    """Validate/stage at 30 FPS under a held lock; prefer preprocessing_session()."""
     source_video = Path(args.video).expanduser().resolve()
     if not source_video.is_file():
         raise FileNotFoundError(f"Input video not found: {source_video}")
 
-    output_dir = Path(args.output_root) / source_video.stem
+    output_dir = preprocess_output_dir(args)
+    require_cache_lock(output_dir)
     preprocess_dir = output_dir / "preprocess"
     staged_video = output_dir / "0_input_video.mp4"
     manifest_path = preprocess_dir / "cache_manifest.json"
@@ -184,6 +186,10 @@ def build_preprocess_cfg(args):
         "model_imgfeat_encoder": getattr(args, "model_imgfeat_encoder", None),
         "sam3d_img_ds": float(args.sam3d_img_ds),
         "sam3d_batch_size": int(args.sam3d_batch_size),
+        "sam3d_runtime": (
+            sam3d_runtime_settings(args.sam3d_root, args.sam3d_ckpt_path)
+            if args.imgfeat_encoder == "sam3d" else None
+        ),
         "tracker": {"type": "yolov8", "base_enlarge": 1.2},
         "pose": {"type": "vitpose_huge_coco_256x192", "img_ds": 0.5},
         "camera": {
@@ -283,6 +289,10 @@ def build_preprocess_cfg(args):
 @torch.no_grad()
 def run_preprocess(cfg):
     """Run tracking, 2D pose, image features, and optional visual odometry."""
+    require_cache_lock(cfg.output_dir)
+    from hmr4d.utils.geo.hmr_cam import convert_K_to_K4, get_bbx_xys_from_xyxy
+    from hmr4d.utils.preproc import Extractor, SAM3DExtractor, SimpleVO, Tracker, VitPoseExtractor
+
     Log.info("[Preprocess] Start")
     tic = Log.time()
     video_path = cfg.video_path
@@ -301,6 +311,8 @@ def run_preprocess(cfg):
         Log.info(f"[Preprocess] bbx from {paths.bbx}")
 
     if cfg.verbose:
+        from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch
+
         video = read_video_np(video_path)
         bbx_xyxy = torch.load(paths.bbx, map_location="cpu")["bbx_xyxy"]
         overlay = draw_bbx_xyxy_on_image_batch(bbx_xyxy, video)
@@ -316,6 +328,8 @@ def run_preprocess(cfg):
         Log.info(f"[Preprocess] vitpose from {paths.vitpose}")
 
     if cfg.verbose:
+        from hmr4d.utils.vis.cv2_utils import draw_coco17_skeleton_batch
+
         video = read_video_np(video_path)
         overlay = draw_coco17_skeleton_batch(video, vitpose, 0.5)
         save_video(overlay, paths.vitpose_video_overlay)
@@ -363,6 +377,7 @@ def run_preprocess(cfg):
                 checkpoint_path=cfg.sam3d_ckpt_path,
                 mhr_path=cfg.sam3d_mhr_path,
                 sam3d_root=cfg.sam3d_root,
+                expected_runtime_settings=OmegaConf.to_container(cfg.cache_config.sam3d_runtime, resolve=True),
                 device="cuda:0",
             )
             features = extractor.extract_video_features(
@@ -478,6 +493,9 @@ def run_preprocess(cfg):
 
 def load_camera_K(cfg, length, width, height):
     """Load calibrated full-image intrinsics or construct a default matrix."""
+    require_cache_lock(cfg.output_dir)
+    from hmr4d.utils.geo.hmr_cam import create_camera_sensor, estimate_K
+
     path = Path(cfg.preprocess_dir) / "camera_K.pt"
     if path.is_file():
         K0 = torch.as_tensor(
@@ -519,6 +537,10 @@ def load_camera_K(cfg, length, width, height):
 
 def load_data_dict(cfg):
     """Load cached preprocessing results into the offline model input dict."""
+    require_cache_lock(cfg.output_dir)
+    from pytorch3d.transforms import quaternion_to_matrix
+    from hmr4d.utils.geo_transform import compute_cam_angvel
+
     length, width, height = get_video_lwh(cfg.video_path)
     if cfg.static_cam:
         R_w2c = torch.eye(3).repeat(length, 1, 1)

@@ -89,7 +89,7 @@ def parse_args():
 
 
 def build_preprocess_cfg(args):
-    """Build the focused video-preprocessing configuration."""
+    """Build config under a held cache lock; prefer preprocessing_session()."""
     from tools.video_preprocess import build_preprocess_cfg as _build
 
     return _build(args)
@@ -113,9 +113,11 @@ def _identity_T_w2c(length):
 def add_video_camera_data(data, cfg):
     """Store full video-camera matrices for Blender render, without changing model inputs."""
     import torch
-    from pytorch3d.transforms import quaternion_to_matrix
+    from motion_lib.motion_utils.rotation_conversions import quaternion_to_matrix
+    from tools.preprocess_cache import require_cache_lock
     from tools.video_preprocess import get_video_lwh
 
+    require_cache_lock(cfg.output_dir)
     length, width, height = get_video_lwh(cfg.video_path)
     if cfg.static_cam:
         T_w2c = _identity_T_w2c(length)
@@ -129,10 +131,15 @@ def add_video_camera_data(data, cfg):
                     f"{traj.shape}: {cfg.paths.slam}"
                 )
             traj_quat = torch.as_tensor(traj[:, [6, 3, 4, 5]], dtype=torch.float32)
+            if (torch.linalg.vector_norm(traj_quat, dim=-1) < 1e-8).any():
+                raise ValueError(f"Zero-length DPVO quaternion: {cfg.paths.slam}")
             R_w2c = quaternion_to_matrix(traj_quat).mT.detach().cpu().numpy().astype(np.float32)
             T_w2c = _identity_T_w2c(length)
             T_w2c[:, :3, :3] = R_w2c
-            T_w2c[:, :3, 3] = np.asarray(traj[:, :3], dtype=np.float32)
+            # DPVO returns T_c2w with the camera center C in world coordinates.
+            # Its rigid inverse is [R_c2w.T, -R_c2w.T @ C].
+            centers_world = np.asarray(traj[:, :3], dtype=np.float32)
+            T_w2c[:, :3, 3] = -np.einsum("tij,tj->ti", R_w2c, centers_world)
         else:
             traj_np = np.asarray(traj, dtype=np.float32)
             if traj_np.shape != (length, 4, 4) or not np.isfinite(traj_np).all():
@@ -344,7 +351,7 @@ def main():
 
     import torch
 
-    from tools.video_preprocess import load_data_dict, run_preprocess
+    from tools.video_preprocess import load_data_dict, run_preprocess, preprocessing_session
     from tools.inference_utils import (
         inspect_checkpoint_imgfeat_encoder,
         load_pipeline,
@@ -376,10 +383,10 @@ def main():
         output = args.output
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    cfg = build_preprocess_cfg(args)
-    run_preprocess(cfg)
-    data = load_data_dict(cfg)
-    add_video_camera_data(data, cfg)
+    with preprocessing_session(args) as cfg:
+        run_preprocess(cfg)
+        data = load_data_dict(cfg)
+        add_video_camera_data(data, cfg)
     data["source_name"] = Path(args.video).stem
     data["source_video"] = args.video
     data["preprocess_dir"] = str(cfg.preprocess_dir)

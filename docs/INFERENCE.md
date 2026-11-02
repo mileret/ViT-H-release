@@ -124,12 +124,57 @@ changing the action duration. Empty videos, invalid/non-monotonic timestamps,
 and inconsistent derived frame counts fail with an error. The exported NPZ
 therefore records the same 30 FPS timeline actually seen by the model.
 
+The final frame's coverage comes from decoded-frame duration when available,
+otherwise a video packet matched by presentation timestamp, or the video
+stream's start time plus duration. Container duration (which may include
+longer audio) and average-FPS/median-spacing guesses are not used. Missing
+reliable final-frame timing is an error. For example, five frames at
+0.00/0.04/0.08/0.12/0.16 seconds with a 0.50-second final frame retain their
+0.66-second content as 20 frames at 30 FPS (0.667 seconds).
+
 Each preprocessing directory contains `preprocess/cache_manifest.json`. The
 cache identity includes a content hash of the source video, the resampling
 version and target FPS, preprocessing settings, encoder choice, checkpoint and
 MHR identities, detector/pose weights, camera method, and optional camera
 calibration. A missing, incomplete, mismatched, or corrupted manifest causes
 the managed cache to be rebuilt.
+
+SAM3D configuration is resolved beside the selected checkpoint first, then
+in its parent directory, matching the
+[Fast-SAM loader](https://github.com/yangtiming/Fast-SAM-3D-Body/blob/main/sam_3d_body/build_models.py).
+The selected `model_config.yaml` must exist and its contents are hashed.
+The identity also includes effective image dimensions, layer precision,
+compile settings, and inference overrides after merging defaults with the
+environment. Changing `IMG_SIZE`, `LAYER_DTYPE`, or the selected YAML causes
+recomputation; explicitly setting an unchanged default does not.
+
+The existing `<output-root>/<video-stem>/preprocess` layout is retained.
+A process lock covers identity validation, invalidation, generation, manifest
+publication, and all subsequent reads into memory (including camera export).
+Two overlapping jobs targeting the same video-stem directory fail explicitly
+with `Preprocessing cache is already in use`, even for identical inputs.
+Retry after the first job completes, or give simultaneous jobs distinct
+`--output-root` values and distinct `--output` NPZ paths. Unrelated directories
+can run concurrently. The OS releases the lock on normal exit or process
+failure; the small `.preprocess.lock` file remains and must not be deleted
+while a job is running.
+
+Python callers must keep the session open until their final cache read:
+
+```python
+from tools.video_preprocess import preprocessing_session, run_preprocess, load_data_dict
+from tools.infer_video import add_video_camera_data
+
+with preprocessing_session(args) as cfg:
+    run_preprocess(cfg)
+    data = load_data_dict(cfg)
+    add_video_camera_data(data, cfg)
+# data now owns the tensors/arrays used by inference.
+```
+
+Calling the lower-level cache entry points without a session/held directory
+lock raises an error. Cache schema 3 and resampling version
+`pyav-timestamp-nearest-v2` invalidate caches made before these fixes.
 
 - `--force-recompute` rebuilds the staged video and all managed preprocessing
   artifacts.
@@ -146,3 +191,25 @@ The NPZ contains:
 - `root_quat_w`: `(T, 4)`, wxyz z-up world quaternion;
 - `body_pos_w`: predicted body points when available;
 - camera calibration and provenance metadata.
+
+`T_w2c` contains homogeneous world-to-camera matrices. For
+[DPVO's camera-to-world trajectory](https://github.com/princeton-vl/DPVO/blob/main/dpvo/dpvo.py),
+the export uses `R_w2c = R_c2w.T` and `t_w2c = -R_w2c @ C_world`, retaining
+DPVO's `xyzw` quaternion input order. Static-camera and SimpleVO conventions
+are unchanged. Regenerate existing DPVO NPZ exports to update their camera
+translation; the raw DPVO trajectory convention has not changed.
+
+## Regression tests
+
+From the repository root in an environment with the release dependencies:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+The follow-up tests use real PyAV files for long final frames, 24/25/30/60 FPS,
+VFR, B-frame reordering, nonzero start times, and longer audio; they verify
+decoded output content as well as duration. SAM3D resource/cache and camera
+tests run on CPU with temporary fixtures. Spawned worker processes use a
+barrier to force cache contention for both different and identical inputs,
+and check recovery after exceptions and process exit.

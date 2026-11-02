@@ -244,10 +244,15 @@ python tools/infer_video.py \
 For the documented `vith_offline_g1.ckpt`, the command selects SAM3D
 automatically and refuses a conflicting encoder by default. Input videos are
 timestamp-resampled to 30 FPS while preserving their duration. Preprocessing
-caches are content-addressed by the source video, settings, and model assets;
+caches are validated by hashes of the source video, effective settings, and model assets;
 use `--force-recompute` to rebuild all managed artifacts or
 `--force-recompute-imgfeat` to rebuild only image features. A user-provided
 `preprocess/camera_K.pt` is validated and is never deleted by either option.
+The selected SAM3D `model_config.yaml` and effective `IMG_SIZE`/`LAYER_DTYPE`
+are part of that identity. Concurrent jobs using the same video-stem cache
+directory are rejected by a process lock; use distinct `--output-root` and
+`--output` paths for simultaneous jobs. See [cache behavior and regression
+tests](docs/INFERENCE.md#timeline-and-cache-behavior) for details.
 
 Video preprocessing additionally requires the external detector, pose,
 body-model, and camera-estimation assets listed in

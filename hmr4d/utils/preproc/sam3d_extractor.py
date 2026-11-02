@@ -10,6 +10,12 @@ import torch
 from tqdm import tqdm
 
 from hmr4d.utils.video_io_utils import read_video_np
+from hmr4d.utils.sam3d_config import (
+    is_fast_sam3d,
+    resolve_sam3d_model_config,
+    sam3d_runtime_settings,
+    setup_fast_sam3d_env,
+)
 
 
 class SAM3DExtractor:
@@ -27,25 +33,15 @@ class SAM3DExtractor:
         tqdm_leave=True,
         feature_dim=1024,
         sam3d_root=None,
+        expected_runtime_settings=None,
     ):
         self.device = device
         self.tqdm_leave = tqdm_leave
         self.feature_dim = int(feature_dim)
         self.sam3d_root = self._setup_sam3d_import(sam3d_root)
-        self.is_fast_sam3d = bool(
-            self.sam3d_root and "fast-sam-3d-body" in str(self.sam3d_root).lower()
-        )
+        self.is_fast_sam3d = is_fast_sam3d(self.sam3d_root)
         if self.is_fast_sam3d:
             self._setup_fast_sam3d_env()
-
-        try:
-            from sam_3d_body import SAM3DBodyEstimator, load_sam_3d_body
-        except Exception as exc:
-            raise ImportError(
-                "Cannot import `sam_3d_body`. Install SAM3D-Body and set "
-                "`SAM3D_BODY_ROOT`, or pass "
-                "`SAM3D_BODY_ROOT` / pass `--sam3d_root` to its repository path."
-            ) from exc
 
         checkpoint_path = checkpoint_path or os.environ.get("SAM3D_CKPT_PATH")
         mhr_path = mhr_path or os.environ.get("SAM3D_MHR_PATH")
@@ -84,6 +80,20 @@ class SAM3DExtractor:
                 "Expected relative path: third-party/Fast-SAM-3D-Body/checkpoints/"
                 "sam-3d-body-dinov3/assets/mhr_model.pt"
             )
+
+        checkpoint_path = str(Path(checkpoint_path).expanduser().resolve())
+        self.model_config_path = resolve_sam3d_model_config(checkpoint_path)
+        self.runtime_settings = sam3d_runtime_settings(self.sam3d_root, checkpoint_path)
+        if expected_runtime_settings is not None and self.runtime_settings != expected_runtime_settings:
+            raise RuntimeError("SAM3D effective settings changed after cache identity was computed; retry preprocessing.")
+
+        try:
+            from sam_3d_body import SAM3DBodyEstimator, load_sam_3d_body
+        except Exception as exc:
+            raise ImportError(
+                "Cannot import `sam_3d_body`. Install SAM3D-Body and set "
+                "`SAM3D_BODY_ROOT` or pass `--sam3d-root` to its repository path."
+            ) from exc
 
         try:
             model, model_cfg = load_sam_3d_body(
@@ -146,17 +156,7 @@ class SAM3DExtractor:
     @staticmethod
     def _setup_fast_sam3d_env():
         """Safe Fast-SAM3D defaults; explicit env/CLI values still win."""
-        os.environ.setdefault("IMG_SIZE", "512")
-        os.environ.setdefault("SKIP_KEYPOINT_PROMPT", "1")
-        os.environ.setdefault("KEYPOINT_PROMPT_INTERM_INTERVAL", "999")
-        os.environ.setdefault("BODY_INTERM_PRED_LAYERS", "0,1,2")
-        os.environ.setdefault("HAND_INTERM_PRED_LAYERS", "0,1")
-        os.environ.setdefault("MHR_NO_CORRECTIVES", "1")
-        os.environ.setdefault("LAYER_DTYPE", "fp32")
-        os.environ.setdefault("DEBUG_NAN", "0")
-        os.environ.setdefault("DEBUG_HAND_PREP", "0")
-        os.environ.setdefault("DEBUG_BACKBONE_INPUT", "0")
-        os.environ.setdefault("INTERM_TIMING", "0")
+        setup_fast_sam3d_env()
 
     def _disable_extra_bbox_padding_for_preprocessed_boxes(self):
         """Keep VITH/PHUMA preprocessed 1.2x square boxes unchanged."""
